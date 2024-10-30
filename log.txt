@@ -1,0 +1,5 @@
+NAME                                       READY   STATUS             RESTARTS        AGE
+health-check-deployment-5d485fdc68-5t4xl   0/1     CrashLoopBackOff   7 (2m7s ago)    14m
+health-check-deployment-5d485fdc68-prj2m   0/1     CrashLoopBackOff   7 (3m14s ago)   14m
+mysql-59bbcb7c58-pm8wg                     1/1     Running            0               14m
+mysql-migration-job-rvd7w                  0/1     Completed          0               14m

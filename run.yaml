@@ -1,0 +1,365 @@
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-secret
+type: Opaque
+data:
+  DB_HOST: bXlzcWw=
+  DB_USER: cm9vdA==
+  DB_NAME: bXlkYg== # имя бд mydb
+  DB_PASSWORD: YWRtaW4xMjM0NSQ=  # base64 кодированное значение "admin12345$"
+  mysql-root-password: YWRtaW4xMjM0NSQ=  # base64 кодированное значение "admin12345$"
+  mysql-user: ZGVtbw==  # base64 кодированное значение "demo"
+  mysql-password: MTIzNDU2  # base64 кодированное значение "123456"
+  mysql-database: bXlkYg==  # base64 кодированное значение "mydb"
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-secret
+  namespace: default  # Убедись, что namespace соответствует твоему окружению
+type: Opaque
+data:
+  RABBITMQ_USER: Z3Vlc3Q=  # base64 кодированное значение "guest"
+  RABBITMQ_PASSWORD: Z3Vlc3Q=  # base64 кодированное значение "guest"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: health-check-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: health-check-service
+  template:
+    metadata:
+      labels:
+        app: health-check-service
+    spec:
+      containers:
+        - name: health-check-service
+          image: itksystem/auth-demo-app:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_HOST
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_NAME
+          resources:
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: health-check-ingress
+  namespace: default
+  annotations:
+#    nginx.ingress.kubernetes.io/use-regex: "true"  # Разрешаем использовать регулярные выражения в путях
+    nginx.ingress.kubernetes.io/rewrite-target: /users  # Переписываем путь для правильного направления трафика
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: arch.homework
+      http:
+        paths:
+          # Маршрутизация для "/health"
+          - path: /users
+            pathType: Prefix
+            backend:
+              service:
+                name: health-check-service
+                port:
+                  number: 80
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: health-check-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 3000        
+  selector:
+    app: health-check-service
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: bitnami/mysql:latest
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: mysql-root-password
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: mysql-password
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-migration-config
+data:
+  MIGRATION_SCRIPT: |
+    CREATE DATABASE IF NOT EXISTS mydb;
+
+    USE mydb;
+
+    CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS accounts (
+        account_id bigint unsigned NOT NULL AUTO_INCREMENT,
+        user_id bigint unsigned NOT NULL,
+        balance decimal(15,2) NOT NULL DEFAULT '0.00',
+        created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (account_id),
+        UNIQUE KEY uniq_user_id (user_id),
+        KEY idx_balance (balance)
+    ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+    CREATE TABLE IF NOT EXISTS orders (
+        order_id bigint unsigned NOT NULL AUTO_INCREMENT,      
+        user_id int unsigned NOT NULL,
+        price decimal(10,2) NOT NULL,
+        status enum('PENDING','SUCCESS','FAILED') NOT NULL DEFAULT 'PENDING',
+        created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        billing_transaction_id varchar(36) DEFAULT NULL,
+        PRIMARY KEY (order_id),
+        KEY idx_user_id (user_id),
+        KEY idx_status (status)
+     ) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+    CREATE TABLE IF NOT EXISTS transactions (
+        transaction_id bigint unsigned NOT NULL AUTO_INCREMENT,
+        account_id bigint unsigned NOT NULL,
+        transaction_type enum('DEPOSIT','WITHDRAWAL','RETURN') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+        amount decimal(15,2) NOT NULL,
+        status enum('PENDING','SUCCESS','FAILED') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'PENDING',
+        reference_id varchar(36) DEFAULT NULL,
+        created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (transaction_id),
+        KEY idx_account_id (account_id),
+        KEY idx_status (status),
+        KEY idx_transaction_type (transaction_type),
+        CONSTRAINT transactions_ibfk_1 FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE ON UPDATE CASCADE
+     ) ENGINE=InnoDB AUTO_INCREMENT=69 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+    CREATE TABLE IF NOT EXISTS warehouse (
+         id bigint AUTO_INCREMENT PRIMARY KEY,
+         product_id bigint NOT NULL,  
+         quantity int NOT NULL,       
+         reserved_quantity int DEFAULT 0,  
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         product_name varchar(255) NOT NULL,
+         price decimal(10,2) NOT NULL DEFAULT '0.00',
+         UNIQUE KEY `idx_product_id` (`product_id`) USING BTREE
+        );
+
+        CREATE INDEX idx_warehouse_product_id ON warehouse (product_id);
+
+    CREATE TABLE IF NOT EXISTS delivery (
+         id BIGINT AUTO_INCREMENT PRIMARY KEY,
+         courier_id BIGINT NOT NULL,  
+         time_slot VARCHAR(50) NOT NULL,  
+         reserved BOOLEAN DEFAULT FALSE,  
+         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         order_id bigint NOT NULL,
+         UNIQUE KEY `delivery_order_id_IDX` (`order_id`) USING BTREE
+        );
+
+        CREATE INDEX idx_delivery_courier_id ON delivery (courier_id);
+        CREATE INDEX idx_delivery_time_slot ON delivery (time_slot);
+
+    CREATE TABLE IF NOT EXISTS `time_slots` (
+        `slot_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+        `slot_begin` time DEFAULT NULL,
+        `slot_end` time DEFAULT NULL,
+        `max_count` int NOT NULL DEFAULT '0',
+        PRIMARY KEY (`slot_id`),
+        KEY `time_slots_slot_begin_IDX` (`slot_begin`) USING BTREE,
+        KEY `time_slots_slot_end_IDX` (`slot_end`) USING BTREE,
+        KEY `time_slots_max_count_IDX` (`max_count`) USING BTREE
+        ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+    CREATE TABLE IF NOT EXISTS `basket` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `user_id` bigint NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `user_id` (`user_id`)
+    ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+    CREATE TABLE IF NOT EXISTS `basket_item` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `basket_id` bigint NOT NULL,
+    `product_id` bigint NOT NULL,
+    `quantity` int DEFAULT '1',
+    `order_id` bigint DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `basket_item_basket_FK` (`basket_id`),
+    KEY `basket_item_product_id_IDX` (`product_id`) USING BTREE,
+    CONSTRAINT `basket_item_basket_FK` FOREIGN KEY (`basket_id`) REFERENCES `basket` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql  # Имя сервиса, который будет использоваться как хост mysql
+  namespace: default  # Убедитесь, что namespace совпадает с namespace пода
+spec:
+  selector:
+    app: mysql  # Метка, соответствующая поду
+  ports:
+    - protocol: TCP
+      port: 3306  # Порт, который будет использован для подключения к MySQL
+      targetPort: 3306  # Порт внутри контейнера MySQL
+
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-migration-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: mysql-migration
+        image: mysql:8
+        env:
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: DB_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: DB_PASSWORD
+        - name: MYSQL_HOST
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: DB_HOST 
+        - name: MIGRATION_SCRIPT
+          valueFrom:
+            configMapKeyRef:
+              name: mysql-migration-config
+              key: MIGRATION_SCRIPT
+        command: ["sh", "-c", "echo \"$MIGRATION_SCRIPT\" | mysql -h $MYSQL_HOST -u root -p$MYSQL_PASSWORD"]
+      restartPolicy: Never
+  backoffLimit: 4
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:3-management
+        ports:
+        - containerPort: 5672  # Порт для AMQP
+        - containerPort: 15672 # Порт для панели управления RabbitMQ
+        env:
+        - name: RABBITMQ_USER
+          value: "guest"
+        - name: RABBITMQ_PASSWORD
+          value: "guest"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-service
+spec:
+  ports:
+    - name: rabbitmq-ampq-port
+      port: 5672  # AMQP
+      targetPort: 5672
+    - name: rabbitmq-management-ui-port
+      port: 15672 # Management UI
+      targetPort: 15672
+  selector:
+    app: rabbitmq
+  type: LoadBalancer
+
+
+
