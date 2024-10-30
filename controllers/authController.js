@@ -7,7 +7,8 @@ const CREDENTIALS_MSG   = 'Укажите email и пароль';
 const CREDENTIALS_INVALID_MSG   = 'Неверные email или пароль';
 const REGISTRATION_SUCCESS_MSG   = 'Пользователь зарегистрирован успешно';
 const tokenExpiredTime = '3h'; // Время жизни токена
-
+const pool = require('../config');
+const version = '1.00'
 
 exports.register = async (req, res) => {
   const { email, password, name } = req.body;
@@ -55,4 +56,19 @@ exports.login = async (req, res) => {
 exports.logout = async (req, res) => {
   const token = req.token; // Получаем токен из запроса (в middleware)
   res.status(200).json({ message: 'Вы успешно вышли из системы.' });
+}
+
+exports.health = async (req, res) => {
+  pool.getConnection((err, connection) => {
+    if (err) {
+      console.error('Failed to obtain connection from pool:', err);
+      res.status(500).json({  health: false, message: 'Server error' }); // выводим ошибку
+    } else {
+      console.log('Connection is active');
+      res.status(200).json({ health: true, version : version }); // выводим ошибку
+      connection.release();
+    }
+  });
+ 
+  
 }
