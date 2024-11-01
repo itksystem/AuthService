@@ -1,1 +1,1 @@
-docker build -t itksystem/auth-demo-app .
+docker build -t itksystem/auth-service .

@@ -1,1 +1,1 @@
-docker push itksystem/auth-demo-app:latest
+docker push itksystem/auth-service:latest
