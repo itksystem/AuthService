@@ -1,11 +1,13 @@
 const db = require('../config');
-const TransactionModel = require('../models/transactionModel');
+const Transaction = require('../helpers/TransactionHelper');
+const AccountDTO =  require('../models/AccountDTO');
+const AccountHelper =  require('../helpers/AccountHelper');
 
  /* создать счет  */
  exports.create = (id) => {
   return new Promise((resolve, reject) => {
     const sql = ' INSERT INTO mydb.accounts (user_id, balance, created_at, updated_at) VALUES( ?, 0.00, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';    
-    db.query(sql, [id], (err, result) => {
+    db.query(sql, [id], (err, result) => {           
       (err)
       ? reject(err)
       : resolve((result[0] != undefined ? result[0]: null));
@@ -16,11 +18,11 @@ const TransactionModel = require('../models/transactionModel');
  /* найти счет */
  exports.findByAccountId = (id) => {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT * FROM mydb.accounts WHERE account_id = ?';
+      const sql = 'SELECT * FROM mydb.accounts WHERE account_id = ?';      
       db.query(sql, [id], (err, result) => {
         (err)
         ? reject(err)
-        : resolve((result[0] != undefined ? result[0]: null));
+        : resolve(new AccountDTO(result[0]));
       });
     });
   };
@@ -28,11 +30,11 @@ const TransactionModel = require('../models/transactionModel');
    /* найти счет */
  exports.findByUserId = (id) => {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT * FROM mydb.accounts WHERE user_id = ?';
+      const sql = 'SELECT * FROM mydb.accounts WHERE user_id = ?';      
       db.query(sql, [id], (err, result) => {
         (err)
         ? reject(err)
-        : resolve((result[0] != undefined ? result[0]: null));
+        : resolve(new AccountDTO(result[0]));        
       });
     });
   };
@@ -65,7 +67,7 @@ const TransactionModel = require('../models/transactionModel');
      /* подкрепление счета суммы транзакии */
      exports.return = (referenceId) => {
         return new Promise(async (resolve, reject) => {
-          const _transaction =  await TransactionModel.findByReferenceId(referenceId);  // создали транзакцию  return     
+          const _transaction =  await Transaction.findByReferenceId(referenceId);  // создали транзакцию  return     
           const sql = `UPDATE accounts SET  balance = balance + ?,  updated_at = CURRENT_TIMESTAMP  WHERE account_id = ?`;
           db.query(sql, [_transaction.amount, _transaction.account_id], (err, result) => {
             (err)

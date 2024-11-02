@@ -1,4 +1,6 @@
 const db = require('../config');
+const { UserPermissionsDTO, RoleDTO, PermissionDTO } = require('../models/UserPermissionsDTO');
+const { UserDTO } = require('../models/UserDTO');
 
 exports.create = (email, password, name) => {
   return new Promise((resolve, reject) => {
@@ -17,7 +19,7 @@ exports.findByEmail = (email) => {
     db.query(sql, [email], (err, result) => {
     (err) 
      ? reject(err)
-     : resolve(result[0]);
+     : resolve(new UserDTO(result[0]));
     });
   });
 };
@@ -28,7 +30,7 @@ exports.findById = (id) => {
     db.query(sql, [id], (err, result) => {
       (err)
       ? reject(err)
-      : resolve(result[0]);
+      : resolve(new UserDTO(result[0]));
     });
   });
 };
@@ -44,31 +46,47 @@ exports.update = (id, name, email) => {
   });
 };
 
-exports.getPermissions = (id) => {  
-  return new Promise((resolve, reject) => {
-    let roles = null;
 
-    // Query to get roles
-    let sqlRoles = 'SELECT DISTINCT(r.name) AS roles FROM users u JOIN user_roles ur ON u.id = ur.user_id JOIN roles r ON r.id = ur.role_id WHERE u.id = ?';
+exports.getPermissions = (id) => {
+  return new Promise((resolve, reject) => {
+    
+    let sqlRoles = `
+      SELECT DISTINCT(r.name) AS roles, r.description
+      FROM users u
+      JOIN user_roles ur ON u.id = ur.user_id
+      JOIN roles r ON r.id = ur.role_id
+      WHERE u.id = ? and u.blocked is null`;
+      
     db.query(sqlRoles, [id], (err, roleResult) => {
       if (err) {
         return reject(err);
       }
-      roles = roleResult.map(row => row.roles);       
+
+      // Создание массивов RoleDTO
+      let roles = roleResult.map(row => new RoleDTO(row.roles, row.description));
+      
       let sqlPermissions = `
-        SELECT DISTINCT(p.name) AS permissions
+        SELECT DISTINCT(p.name) AS permissions, p.description
         FROM users u
         JOIN user_roles ur ON u.id = ur.user_id
         JOIN role_permissions rp ON ur.role_id = rp.role_id
         JOIN permissions p ON rp.permission_id = p.id
-        WHERE u.id = ?`;
+        WHERE u.id = ? and u.blocked is null`;
 
       db.query(sqlPermissions, [id], (err, permissionResult) => {
         if (err) {
           return reject(err);
         }
-        const permissions = permissionResult.map(row => row.permissions); 
-        resolve({ roles, permissions });
+
+        // Создание массивов PermissionDTO
+        const permissions = permissionResult.map(row => new PermissionDTO(row.permissions, row.description)); 
+        
+        const userPermissionsDTO = new UserPermissionsDTO(roles, permissions);
+        
+        resolve({
+          roles: userPermissionsDTO.getRoles(), // получение в формате { roleCode: "..." }
+          permissions: userPermissionsDTO.getPermissions() // получение в формате { permCode: "..." }
+        });
       });
     });
   });
