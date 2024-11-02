@@ -14,6 +14,7 @@ const pool = mysql.createPool({
 
 const connectWithRetry = ( retries = 5, delay = 2000) => {
   return new Promise((resolve, reject) => {
+    console.log( process.env.DB_HOST, process.env.DB_USER, process.env.DB_NAME );
     pool.getConnection((err, connection) => {
       if (err) {
         console.error('Failed to connect to MySQL database:', err);

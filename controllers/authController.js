@@ -5,6 +5,7 @@ const AccountModel = require('../models/accountModel');
 const CREDENTIALS_MSG   = 'Укажите email и пароль';
 const CREDENTIALS_INVALID_MSG   = 'Неверные email или пароль';
 const REGISTRATION_SUCCESS_MSG   = 'Пользователь зарегистрирован успешно';
+const HTTP_401_MSG   = 'Требуется авторизация';
 const USER_LOGOUT_MSG   = 'Вы успешно вышли из системы.';
 const SERVER_ERROR_MSG = 'Server error';
 const tokenExpiredTime = '3h'; // Время жизни токена
@@ -90,3 +91,17 @@ exports.health = async (req, res) => {
     connection.release();
   });
 };
+
+
+exports.getPermissions = async (req, res) => {
+  const userId  = req.user.id; 
+  if (!userId ) return res.status(401).json({ message: HTTP_401_MSG });  
+  try {
+    const permissions = await User.getPermissions(userId);  // находим пользователя в БД
+    if (!permissions)  return res.status(400).json({ message: HTTP_401_MSG });
+    res.json({ permissions })
+  } catch (error) {
+    res.status(500).json({ message: error.message }); // выводим ошибку
+  }
+};
+
