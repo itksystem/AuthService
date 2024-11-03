@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const userHelper = require('../helpers/UserHelper');
-const accountHelper = require('../helpers/AccountHelper');
+const userHelper = require('openfsm-user-helper');
+const accountHelper = require('openfsm-account-helper');
 const CREDENTIALS_MSG   = 'Укажите email и пароль';
 const CREDENTIALS_INVALID_MSG   = 'Неверные email или пароль';
 const REGISTRATION_SUCCESS_MSG   = 'Пользователь зарегистрирован успешно';
@@ -11,8 +11,8 @@ const USER_LOGOUT_MSG   = 'Вы успешно вышли из системы.';
 const SERVER_ERROR_MSG = 'Server error';
 const WELCOME_EMAIL_TEMPLATE = 'WELCOME_EMAIL_TEMPLATE';
 const tokenExpiredTime = '3h'; // Время жизни токена
-const pool = require('../config');
-const MailNotificationProducer  =  require('../helpers/MailNotificationProducer'); // ходим в почту через шину
+const pool = require('openfsm-database-connection-producer');
+const MailNotificationProducer  =  require('openfsm-mail-notification-producer'); // ходим в почту через шину
 require('dotenv').config();
 const version = '1.0.0'
 const { DateTime } = require('luxon');
