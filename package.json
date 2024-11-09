@@ -25,7 +25,7 @@
     "openfsm-permissions-dto": "^1.0.0",
     "openfsm-transaction-helper": "^1.0.1",
     "openfsm-user-dto": "^1.0.0",
-    "openfsm-user-helper": "^1.0.1",
+    "openfsm-user-helper": "^1.0.2",
     "uuid": "^8.3.2"
   }
 }
