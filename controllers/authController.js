@@ -12,12 +12,14 @@ const SERVER_ERROR_MSG = 'Server error';
 const WELCOME_EMAIL_TEMPLATE = 'WELCOME_EMAIL_TEMPLATE';
 const tokenExpiredTime = '3h'; // Время жизни токена
 const pool = require('openfsm-database-connection-producer');
+const common = require('openfsm-common');  /* Библиотека с общими параметрами */
 const MailNotificationProducer  =  require('openfsm-mail-notification-producer'); // ходим в почту через шину
 require('dotenv').config();
 const version = '1.0.0'
 const { DateTime } = require('luxon');
 
 exports.register = async (req, res) => {
+  console.log('Received data:', req.body);
   const { email, password, name } = req.body;
 
   if (!email || !password) return res.status(400).json({ message: CREDENTIALS_MSG });
@@ -25,7 +27,9 @@ exports.register = async (req, res) => {
     const hashedPassword  = await bcrypt.hash(password, 10);
     await userHelper.create(email, hashedPassword, name);        // зарегистрировали пользователя
     const user = await userHelper.findByEmail(email);            // находим пользователя в БД
+    await userHelper.setCustomerRole(user.getId(), common.USER_CUSTOMER_ROLE);              // устанавливаем роль - "Клиент" при регистрации
     await accountHelper.create(user.getId());                    // создали счет
+    
    
     const mailProducer = new MailNotificationProducer();         // отправляем уведомление о регистрации
     mailProducer.sendMailNotification(user.getId(), WELCOME_EMAIL_TEMPLATE, {})

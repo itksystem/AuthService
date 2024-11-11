@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const authRoutes = require('./routes/auth');
 
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParser.json({ type: 'application/json' }));
 
 app.use(function(request, response, next){
   console.log(request.url);  
