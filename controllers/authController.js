@@ -7,87 +7,79 @@ const CREDENTIALS_INVALID_MSG   = 'Неверные email или пароль';
 const REGISTRATION_SUCCESS_MSG   = 'Пользователь зарегистрирован успешно';
 const HTTP_401_MSG   = 'Требуется авторизация';
 const HTTP_403_MSG   = 'Пользователь заблокирован';
-const USER_LOGOUT_MSG   = 'Вы успешно вышли из системы.';
+const USER_LOGOUT_MSG   = 'Вы вышли из системы.';
 const SERVER_ERROR_MSG = 'Server error';
 const WELCOME_EMAIL_TEMPLATE = 'WELCOME_EMAIL_TEMPLATE';
 const tokenExpiredTime = '3h'; // Время жизни токена
 const pool = require('openfsm-database-connection-producer');
 const common = require('openfsm-common');  /* Библиотека с общими параметрами */
+const CommonFunctionHelper = require("openfsm-common-functions")
+const commonFunction= new CommonFunctionHelper();
+const cookieParser = require('cookie-parser');
+
+// Объявляем черный список токенов
+exports.tokenBlacklist = new Set();  // по хорошему стоит хранить их в отдельном хранилище, чтобы не потерять при перезагрузке приложения. Например в BD или в redis
+
+
 const MailNotificationProducer  =  require('openfsm-mail-notification-producer'); // ходим в почту через шину
 require('dotenv').config();
 const version = '1.0.0'
 const { DateTime } = require('luxon');
 
 exports.register = async (req, res) => {
-  console.log('Received data:', req.body);
-  const { email, password, name } = req.body;
-
-  if (!email || !password) return res.status(400).json({ message: CREDENTIALS_MSG });
   try {
+    console.log('Received data:', req.body);
+    const { email, password, name } = req.body;  
+    if (!email || !password) throw(400)
     const hashedPassword  = await bcrypt.hash(password, 10);
-    await userHelper.create(email, hashedPassword, name);        // зарегистрировали пользователя
-    const user = await userHelper.findByEmail(email);            // находим пользователя в БД
-    await userHelper.setCustomerRole(user.getId(), common.USER_CUSTOMER_ROLE);              // устанавливаем роль - "Клиент" при регистрации
-    await accountHelper.create(user.getId());                    // создали счет
-    
-   
-    const mailProducer = new MailNotificationProducer();         // отправляем уведомление о регистрации
-    mailProducer.sendMailNotification(user.getId(), WELCOME_EMAIL_TEMPLATE, {})
-        .then(() => {
+    await userHelper.create(email, hashedPassword, name);                         // зарегистрировали пользователя
+    const user = await userHelper.findByEmail(email);                             // находим пользователя в БД
+    await userHelper.setCustomerRole(user.getId(), common.USER_ROLES.CUSTOMER);   // устанавливаем роль - "Клиент" при регистрации
+    await accountHelper.create(user.getId());                                     // создали счет
+    const mailProducer = new MailNotificationProducer();                          // отправляем уведомление о регистрации
+    mailProducer.sendMailNotification(user.getId(),  WELCOME_EMAIL_TEMPLATE, {})
+        .then(() => { 
                 console.log('Mail sent successfully!');
           })
         .catch(err => {
                 console.error('Failed to send mail:', err);
-        });
-    
+        });    
     res.status(201).json({ message: REGISTRATION_SUCCESS_MSG  });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status((Number(error) || 500)).json({ code: (Number(error) || 500), message:  commonFunction.getDescriptionByCode((Number(error) || 500)) });    
   }
 };
 
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) return res.status(400).json({ message: CREDENTIALS_MSG });
   try {
-    const user = await userHelper.findByEmail(email);  // находим пользователя в БД
-    if (!user) return res.status(400).json({ message: CREDENTIALS_INVALID_MSG });
-      
-    const isMatch = await bcrypt.compare(password, user.getPassword()); // сравниваем хэш пароля, вынесли в отдельную функцию чтобы sql-inject снизить
-    if (!isMatch) return res.status(400).json({ message: CREDENTIALS_INVALID_MSG });
+   const { email, password } = req.body;
+   if (!email || !password) throw(400)
 
-    const token = jwt.sign({ id: user.getId() }, process.env.JWT_SECRET, { expiresIn: tokenExpiredTime}); // герерируем токен
-    res.json({ token })
+   const user = await userHelper.findByEmail(email);  // находим пользователя в БД
+   if (!user) throw(400)
+     
+   const isMatch = await bcrypt.compare(password, user.getPassword()); // сравниваем хэш пароля, вынесли в отдельную функцию чтобы sql-inject снизить
+   if (!isMatch) throw(400)
+
+   const token = jwt.sign({ id: user.getId() }, process.env.JWT_SECRET, { expiresIn: tokenExpiredTime}); // герерируем токен
+   res.json({ token })
   } catch (error) {
-    res.status(500).json({ message: error.message }); // выводим ошибку
+    res.status((Number(error) || 500)).json({ code: (Number(error) || 500), message:  commonFunction.getDescriptionByCode((Number(error) || 500)) });    
   }
 };
 
-exports.logout = async (req, res) => {
-  const token = req.token; // Получаем токен из запроса (в middleware)
-  res.status(200).json({ message: USER_LOGOUT_MSG });
-}
 
 exports.health = async (req, res) => {
   const startTime = DateTime.local(); // Начало отсчета с учетом временной зоны сервера
-
   pool.getConnection((err, connection) => {
     if (err) {
       console.error('Failed to obtain connection from pool:', err);
       return res.status(500).json({ health: false, message: SERVER_ERROR_MSG});
     }
-
     console.log('Connection is active');
     const endTime = DateTime.local(); // Конец отсчета с учетом временной зоны сервера
-
-    // Рассчитываем задержку
     const delay = endTime.diff(startTime, 'milliseconds').milliseconds;
-
-    // Форматируем дату и время в формате ISO 8601
     const formattedDate = endTime.toISO();
-    console.log(formattedDate);
-
     res.status(200).json({
       health: true,
       version: version,
@@ -101,15 +93,48 @@ exports.health = async (req, res) => {
 
 
 exports.getPermissions = async (req, res) => {
-  const userId  = req.user.id; 
-  if (!userId ) return res.status(401).json({ code: 401, message: HTTP_401_MSG });  
   try {
+    const userId  = req.user.id; 
+    if (!userId ) throw(400);
     const userPermissions = await userHelper.getPermissions(userId);  // ищем права пользователя 
-    return (userPermissions.permissions.length == 0 
-      ? res.status(403).json({ code: 403, message: HTTP_403_MSG }) 
-      : res.status(200).json({ userPermissions }) ) ;    
+    if(userPermissions.permissions.length == 0) throw(403)
+    return res.status(200).json({ userPermissions }) 
   } catch (error) {
-    res.status(500).json({ message: error.message }); // выводим ошибку
+    res.status((Number(error) || 500)).json({ code: (Number(error) || 500), message:  commonFunction.getDescriptionByCode((Number(error) || 500)) });    
   }
 };
 
+exports.checkToken = async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const cookies = req.cookies;
+    var  token = (authHeader && authHeader.split(' ')[1]) || (cookies && cookies.accessToken)     
+    if (!token) throw(401)      
+    if (exports.tokenBlacklist.has(token)) throw(401)      
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) throw(401)          
+        req.user = user;   // Добавляем информацию о пользователе в объект запроса
+        req.token = token; // Сохраняем токен для использования в logout
+    });
+    res.status(200).json({ user : req.user, token : req.token });      
+  } catch (error) {
+    if(Number(error) == 401 )
+      tokenBlacklist.add(token);
+    res.status((Number(error) || 500)).json({ code: (Number(error) || 500), message:  commonFunction.getDescriptionByCode((Number(error) || 500)) });    
+  }
+};
+
+
+exports.logout = async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const cookies = req.cookies;
+    var  token = (authHeader && authHeader.split(' ')[1]) || (cookies && cookies.accessToken)     
+    if (!token) throw(401)      
+    if (exports.tokenBlacklist.has(token)) throw(401)      
+      exports.tokenBlacklist.add(token);
+    res.status(200).json({ message : USER_LOGOUT_MSG });      
+  } catch (error) {
+    res.status((Number(error) || 500)).json({ code: (Number(error) || 500), message:  commonFunction.getDescriptionByCode((Number(error) || 500)) });    
+  }
+}

@@ -13,5 +13,5 @@ app.use(function(request, response, next){
 app.use('/api/auth', authRoutes);
 
 app.listen(process.env.PORT, () => {
-  console.log(`Server running on port ${process.env.PORT}`);
+  console.log(`Auth Service running on port ${process.env.PORT}`);
 });
