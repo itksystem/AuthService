@@ -104,6 +104,19 @@ exports.getPermissions = async (req, res) => {
   }
 };
 
+
+exports.getMe= async (req, res) => {
+  try {
+    const userId  = req.user.id; 
+    if (!userId ) throw(400);
+    const login = await userHelper.getMe(userId);  // ищем данные по пользователю
+    if(!login) throw(402)
+    return res.status(200).json( login ) 
+  } catch (error) {
+    res.status((Number(error) || 500)).json({ code: (Number(error) || 500), message:  commonFunction.getDescriptionByCode((Number(error) || 500)) });    
+  }
+}
+
 exports.checkToken = async (req, res) => {
   try {
     const authHeader = req.headers['authorization'];
