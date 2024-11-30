@@ -17,14 +17,37 @@ const CommonFunctionHelper = require("openfsm-common-functions")
 const commonFunction= new CommonFunctionHelper();
 const cookieParser = require('cookie-parser');
 
+require('dotenv').config();
+const ClientProducerAMQP  =  require('openfsm-client-producer-amqp'); // ходим в почту через шину
+const amqp = require('amqplib');
+
+/* Коннектор для шины RabbitMQ */
+const {
+  RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USER, RABBITMQ_PASSWORD, RABBITMQ_PAYMENT_ACCOUNT_CREATE_QUEUE  } = process.env;
+const login = RABBITMQ_USER || 'guest';
+const pwd = RABBITMQ_PASSWORD || 'guest';
+const PAYMENT_ACCOUNT_CREATE_QUEUE = RABBITMQ_PAYMENT_ACCOUNT_CREATE_QUEUE || 'PAYMENT_ACCOUNT_CREATE';
+const host = RABBITMQ_HOST || 'rabbitmq-service';
+const port = RABBITMQ_PORT || '5672';
+
 // Объявляем черный список токенов
 exports.tokenBlacklist = new Set();  // по хорошему стоит хранить их в отдельном хранилище, чтобы не потерять при перезагрузке приложения. Например в BD или в redis
-
 
 const MailNotificationProducer  =  require('openfsm-mail-notification-producer'); // ходим в почту через шину
 require('dotenv').config();
 const version = '1.0.0'
 const { DateTime } = require('luxon');
+
+async function paymentAccountCreateMessage(msg){ // создаем балансовый счет пользователя
+  try {
+     let rabbitClient = new ClientProducerAMQP();
+      await  rabbitClient.sendMessage(PAYMENT_ACCOUNT_CREATE_QUEUE, msg)  
+    } catch (error) {
+      console.log(`paymentAccountCreateMessage. Ошибка ${error}`);
+  } 
+  return;
+}
+
 
 exports.register = async (req, res) => {
   try {
@@ -35,7 +58,8 @@ exports.register = async (req, res) => {
     await userHelper.create(email, hashedPassword, name);                         // зарегистрировали пользователя
     const user = await userHelper.findByEmail(email);                             // находим пользователя в БД
     await userHelper.setCustomerRole(user.getId(), common.USER_ROLES.CUSTOMER);   // устанавливаем роль - "Клиент" при регистрации
-    await accountHelper.create(user.getId());                                     // создали счет
+    // await accountHelper.create(user.getId());                                     // создали счет
+    await paymentAccountCreateMessage({userId : user.getId()});                                      // отправили сообщение для создания счета 
     const mailProducer = new MailNotificationProducer();                          // отправляем уведомление о регистрации
     mailProducer.sendMailNotification(user.getId(),  WELCOME_EMAIL_TEMPLATE, {})
         .then(() => { 
@@ -46,7 +70,9 @@ exports.register = async (req, res) => {
         });    
     res.status(201).json({ message: REGISTRATION_SUCCESS_MSG  });
   } catch (error) {
-    res.status((Number(error) || 500)).json({ code: (Number(error) || 500), message:  commonFunction.getDescriptionByCode((Number(error) || 500)) });    
+    (error?.errno== 1062) 
+      ? res.status(409).json({ code: 409, message:  'Такой пользователь уже существует'})    
+      : res.status((Number(error) || 500)).json({ code: (Number(error) || 500), message:  commonFunction.getDescriptionByCode((Number(error) || 500)) });    
   }
 };
 

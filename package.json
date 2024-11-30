@@ -21,7 +21,7 @@
     "mysql2": "^3.11.3",
     "openfsm-account-dto": "^1.0.0",
     "openfsm-account-helper": "^1.0.1",
-    "openfsm-client-producer-amqp": "^1.0.0",
+    "openfsm-client-producer-amqp": "^1.0.1",
     "openfsm-common": "^1.0.7",
     "openfsm-common-functions": "^1.0.1",
     "openfsm-database-connection-producer": "^1.0.0",
