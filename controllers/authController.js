@@ -9,7 +9,7 @@ const HTTP_401_MSG   = 'Требуется авторизация';
 const HTTP_403_MSG   = 'Пользователь заблокирован';
 const USER_LOGOUT_MSG   = 'Вы вышли из системы.';
 const SERVER_ERROR_MSG = 'Server error';
-const WELCOME_EMAIL_TEMPLATE = 'WELCOME_EMAIL_TEMPLATE';
+const WELCOME_EMAIL_TEMPLATE = 'NEW_USER_NOTIFICATION';
 const tokenExpiredTime = '3h'; // Время жизни токена
 const pool = require('openfsm-database-connection-producer');
 const common = require('openfsm-common');  /* Библиотека с общими параметрами */
@@ -79,13 +79,16 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
    const { email, password } = req.body;
-   if (!email || !password) throw(400)
+   if (!email || !password) 
+    return res.status((400)).json({ code: (400), message:  commonFunction.getDescriptionByCode(400) });    
 
    const user = await userHelper.findByEmail(email);  // находим пользователя в БД
-   if (!user) throw(400)
-     
+   if (!user) 
+   return res.status((403)).json({ code: (403), message:  commonFunction.getDescriptionByCode(403) });    
+         
    const isMatch = await bcrypt.compare(password, user.getPassword()); // сравниваем хэш пароля, вынесли в отдельную функцию чтобы sql-inject снизить
-   if (!isMatch) throw(400)
+   if (!isMatch) 
+    return res.status((403)).json({ code: (403), message:  commonFunction.getDescriptionByCode(403) });    
 
    const token = jwt.sign({ id: user.getId() }, process.env.JWT_SECRET, { expiresIn: tokenExpiredTime}); // герерируем токен
    res.json({ token })

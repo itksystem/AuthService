@@ -26,13 +26,19 @@ exports.authenticateToken  = (req, res, next) => {
   const cookies = req.cookies;
   console.log(req.cookies);
   var  token = (authHeader && authHeader.split(' ')[1]) || (cookies && cookies.accessToken)   
-  if (!token) return res.sendStatus(401);
+  if (!token) {
+    console.log(`not token!`);
+    return res.sendStatus(401);
+  }  
   if (tokenBlacklist.has(token)) {
+     console.log(`token ${token}  in black list!`);
      return res.status(401).json({ message: NO_AUTH_MSG });
 }
     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-      if (err) 
+      if (err) {
+        console.log(`${err}`);
         return res.sendStatus(401);
+      }  
       req.user = user;   // Добавляем информацию о пользователе в объект запроса
       req.token = token; // Сохраняем токен для использования в logout
       next();
