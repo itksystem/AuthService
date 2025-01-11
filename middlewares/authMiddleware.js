@@ -6,18 +6,6 @@ const { tokenBlacklist } = require('../controllers/authController');
 // Объявляем черный список токенов
 // const tokenBlacklist = new Set();  // по хорошему стоит хранить их в отдельном хранилище, чтобы не потерять при перезагрузке приложения. Например в BD или в redis
 const NO_AUTH_MSG = 'Токен недействителен. Необходима авторизация в системе.' ;
-/*
-exports.logout = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.sendStatus(401); 
-  if (tokenBlacklist.has(token)) {  // Проверка на наличие токена в черном списке
-    return res.status(401).json({ message: NO_AUTH_MSG});
-   } else      // Добавляем токен в черный список
-     tokenBlacklist.add(token);
-    next();  
-};
-*/
 
 /* проверка токена для внутреннего API */
 exports.authenticateToken  = (req, res, next) => {

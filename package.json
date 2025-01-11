@@ -14,6 +14,7 @@
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
+    "crypto": "^1.0.1",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
@@ -25,11 +26,13 @@
     "openfsm-common": "^1.0.7",
     "openfsm-common-functions": "^1.0.1",
     "openfsm-database-connection-producer": "^1.0.0",
+    "openfsm-logger-handler": "^1.0.0",
     "openfsm-mail-notification-producer": "^1.0.1",
     "openfsm-permissions-dto": "^1.0.0",
     "openfsm-transaction-helper": "^1.0.1",
     "openfsm-user-dto": "^1.0.0",
     "openfsm-user-helper": "^1.0.3",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "winston": "^3.17.0"
   }
 }

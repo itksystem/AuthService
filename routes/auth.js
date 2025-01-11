@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, logout, health, getPermissions, checkToken, getMe } = require('../controllers/authController');
+const { register, login, logout, health, getPermissions, checkToken, getMe, checkVerificationCode, resendVerificationCode } = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
 
 router.post('/v1/register', register);
@@ -10,5 +10,8 @@ router.get('/v1/getPermissions', authMiddleware.authenticateToken, getPermission
 router.get('/v1/@me', authMiddleware.authenticateToken, getMe);
 router.post('/v1/checkToken', authMiddleware.authenticateToken, checkToken);
 router.get('/health', health);
+
+router.post('/v1/checkCode', authMiddleware.authenticateToken, checkVerificationCode);
+router.post('/v1/resendCode', authMiddleware.authenticateToken, resendVerificationCode);
 
 module.exports = router;
