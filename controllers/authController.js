@@ -339,15 +339,16 @@ exports.checkVerificationCode = async (req, res) => {
   try {
     const userId = req.user.id;
     if (!userId) throw 400;
-
+/*
     const token = exports.getToken(req, res);
     if (!token) throw 401;
 
     const tokenVerificationResult = await exports.tokenVerification(req, res);
     if (!tokenVerificationResult) throw 401;
-
+*/
     const { verificationCode } = req.body;
     const user = await userHelper.findById(userId);
+    console.log(userId, verificationCode, user.getVerificationCode());
     if (!user || !user.getVerificationCode()) throw 409;
 
     let storageCode = exports.verificationCodeStorage.get(user.getId()) || null;
@@ -356,15 +357,12 @@ exports.checkVerificationCode = async (req, res) => {
     if (!user.getConfirmed()) {
       if (!storageCode) {
         // Добавляем код и инициализируем попытки
-        exports.verificationCodeStorage.set(user.getId(), {
-          code: user.getVerificationCode(),
-          retry: 0,
-        });
-        storageCode = exports.verificationCodeStorage.get(user.getId());
+         exports.verificationCodeStorage.set(user.getId(),  user.getVerificationCode(),  0, );
+         storageCode = exports.verificationCodeStorage.get(user.getId());
       } else if (storageCode.retry >= exports.verificationCodeStorage.maxRetry) {
         // Превышено число попыток
         exports.verificationCodeStorage.delete(user.getId());
-        exports.tokenBlacklist.add(token);
+        exports.tokenBlacklist.add(exports.getToken(req, res));
         return res.status(401).json({
           status: false,
           retry: exports.verificationCodeStorage.maxRetry,
@@ -373,7 +371,8 @@ exports.checkVerificationCode = async (req, res) => {
       }
 
       // Проверяем код
-      if (verificationCode === storageCode.code) {
+      console.log(Number(verificationCode) === Number(storageCode.code),verificationCode, storageCode.code)
+      if (Number(verificationCode) === Number(storageCode.code)) {
         const confirmResult = await userHelper.setConfirmed(user.getId());
         if (!confirmResult) throw 500;
 
@@ -384,8 +383,7 @@ exports.checkVerificationCode = async (req, res) => {
           .json({ status: true, message: 'Регистрация подтверждена' });
       } else {
         // Код неверен
-        storageCode.retry++;
-        exports.verificationCodeStorage.set(user.getId(), storageCode);
+        exports.verificationCodeStorage.incrementRetry(user.getId())
 
         return res.status(422).json({
           status: false,
@@ -398,6 +396,7 @@ exports.checkVerificationCode = async (req, res) => {
     // Пользователь уже подтвержден
     res.status(200).json({ status: true, message: 'Регистрация уже подтверждена' });
   } catch (error) {
+    logger.error(error);
     res
       .status(Number(error) || 500)
       .json({
