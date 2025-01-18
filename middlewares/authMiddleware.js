@@ -10,9 +10,8 @@ const NO_AUTH_MSG = 'Токен недействителен. Необходим
 /* проверка токена для внутреннего API */
 exports.authenticateToken  = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  console.log(req.headers);
-  const cookies = req.cookies;
-  console.log(req.cookies);
+  console.log('req.headers => ', req.headers, ' req.cookies =>', req.cookies);
+  const cookies = req.cookies;  
   var  token = (authHeader && authHeader.split(' ')[1]) || (cookies && cookies.accessToken)   
   if (!token) {
     console.log(`not token!`);
