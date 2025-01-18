@@ -2,10 +2,8 @@
 require('dotenv').config();
 const cookieParser = require('cookie-parser');
 const { tokenBlacklist } = require('../controllers/authController');
-
-// Объявляем черный список токенов
-// const tokenBlacklist = new Set();  // по хорошему стоит хранить их в отдельном хранилище, чтобы не потерять при перезагрузке приложения. Например в BD или в redis
-const NO_AUTH_MSG = 'Токен недействителен. Необходима авторизация в системе.' ;
+const MESSAGES = require('openfsm-common-auth-services').MESSAGES;  /* Библиотека с общими параметрами для Auth*/
+const LANGUAGE = 'RU';
 
 /* проверка токена для внутреннего API */
 exports.authenticateToken  = (req, res, next) => {
@@ -19,7 +17,7 @@ exports.authenticateToken  = (req, res, next) => {
   }  
   if (tokenBlacklist.has(token)) {
      console.log(`token ${token}  in black list!`);
-     return res.status(401).json({ message: NO_AUTH_MSG });
+     return res.status(401).json({ message: MESSAGES[LANGUAGE].NO_AUTH_MSG });
 }
     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
       if (err) {
