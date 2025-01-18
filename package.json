@@ -24,6 +24,7 @@
     "openfsm-account-helper": "^1.0.1",
     "openfsm-client-producer-amqp": "^1.0.1",
     "openfsm-common": "^1.0.7",
+    "openfsm-common-auth-services": "^1.0.1",
     "openfsm-common-functions": "^1.0.1",
     "openfsm-database-connection-producer": "^1.0.0",
     "openfsm-logger-handler": "^1.0.0",
@@ -32,6 +33,7 @@
     "openfsm-transaction-helper": "^1.0.1",
     "openfsm-user-dto": "^1.0.0",
     "openfsm-user-helper": "^1.0.3",
+    "pg": "^8.13.1",
     "uuid": "^8.3.2",
     "winston": "^3.17.0"
   }
