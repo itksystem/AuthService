@@ -7,21 +7,25 @@ const common = require('openfsm-common');  /* Библиотека с общим
 const MESSAGES = require('openfsm-common-auth-services').MESSAGES;  /* Библиотека с общими параметрами для Auth*/
 const LANGUAGE = 'RU';
 const CommonFunctionHelper = require("openfsm-common-functions")
+const commonFunction = new CommonFunctionHelper();
 const _response= new CommonFunctionHelper();
+// Обертка для ответов
+const ResponseHelper = require("openfsm-response-helper")
+const response = new ResponseHelper();
+
 const cookieParser = require('cookie-parser');
 const {VerificationCodeProcessStorage}  = require("../helpers/VerificationCodeProcessStorage");
 const logger = require('openfsm-logger-handler');
-const AuthError = require('../helpers/CustomError')
+const AuthError = require('openfsm-custom-error')
 
 
-require('dotenv').config();
+require('dotenv').config({ path: '.env-auth-service' });
 
 // Объявляем черный список токенов
 exports.tokenBlacklist = new Set();  // по хорошему стоит хранить их в отдельном хранилище, чтобы не потерять при перезагрузке приложения. Например в BD или в redis
 // Объявляем хранилище попыток отправки кода
 exports.verificationCodeStorage = new VerificationCodeProcessStorage();  // по хорошему стоит хранить их в отдельном хранилище, чтобы не потерять при перезагрузке приложения. Например в BD или в redis
 
-require('dotenv').config();
 
 const { DateTime } = require('luxon');
 
@@ -48,7 +52,7 @@ exports.register = async (req, res) => {
     
     res.status(201).json({ message: MESSAGES[LANGUAGE].USER_REGISTERED_SUCCESSFULLY}); // Успешная регистрация
   } catch (error) {       
-    _response.sendError(req, res, error); 
+    response.error(req, res, error); 
   }
 };
 
@@ -69,7 +73,7 @@ exports.login = async (req, res) => {
     res.status(200).json({ token })
 
   } catch (error) {    
-    _response.sendError(req, res, error); 
+    response.error(req, res, error); 
   }
 };
 
@@ -88,7 +92,7 @@ exports.health = async (req, res) => {
     // Успешный ответ
     res.status(200).json({health: true, request_timeout: delay, datetime: formattedDate, });
   } catch (err) {
-    _response.sendError(req, res, err); 
+    response.error(req, res, error); 
   }
 };
 
@@ -105,7 +109,7 @@ exports.getPermissions = async (req, res) => {
 
      return res.status(200).json({ userPermissions });
    } catch (error) {
-    _response.sendError(req, res, err); 
+    response.error(req, res, error); 
   }
 };
 
@@ -121,7 +125,7 @@ exports.getMe = async (req, res) => {
     return res.status(200).json(login); // Успешный ответ
 
   } catch (error) {
-    _response.sendError(req, res, err);     
+    response.error(req, res, error); 
   }
 };
 
@@ -165,7 +169,7 @@ exports.checkToken = async (req, res) => {
     if ( (error instanceof CustomError) && error?.code === 401 && token) {
       exports.tokenBlacklist.add(token);
     }
-    _response.sendError(req, res, err);     
+    response.error(req, res, error);    
   }
 };
 
@@ -181,7 +185,7 @@ exports.logout = async (req, res) => {
      exports.tokenBlacklist.add(token);    // Добавляем токен в черный список    
      return res.status(200).json({ message: MESSAGES[LANGUAGE].USER_LOGOUT }); // Возвращаем успешный ответ
   } catch (error) {    
-    _response.sendError(req, res, err); // Обработка ошибок
+    response.error(req, res, error); 
   }
 };
 
@@ -248,7 +252,7 @@ exports.checkVerificationCode = async (req, res) => {
     // Пользователь уже подтвержден
     res.status(200).json({ status: true, message: MESSAGES[LANGUAGE].REGISTRATION_ALREADY_CONFIRMED });
   } catch (error) {    
-    _response.sendError(req, res, err); // Обработка ошибок
+    response.error(req, res, error); 
   }
 };
 
@@ -269,8 +273,7 @@ exports.resendVerificationCode = async (req, res) => {
     
     await userHelper.sendMessage(userHelper.MAIL_QUEUE, userHelper.getNewVerificationCodeMail(user)); // Отправка письма с новым кодом    
     res.status(200).json({ status: true, message: MESSAGES[LANGUAGE].CODE_CHANGED_ENTER_NEW }); // Успешный ответ
-
   } catch (error) {
-    _response.sendError(req, res, err); // Обработка ошибок
+    response.error(req, res, error); 
   }
 };
