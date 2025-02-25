@@ -121,7 +121,13 @@ exports.getMe = async (req, res) => {
     
     const login = await userHelper.getMe(userId); // Получаем данные пользователя    
     if (!login) throw new AuthError(402, MESSAGES[LANGUAGE].USER_NOT_FOUND  );  // Проверка наличия данных пользователя
-    
+
+    const authHeader = req.headers['authorization'];
+    const tokenFromHeader = authHeader?.split(' ')[1] || null;    
+    const tokenFromCookies = req.cookies?.accessToken || null; // Получение токена из cookies    
+    const token = tokenFromHeader || tokenFromCookies; // Возврат токена из заголовка или cookies, если доступно
+    login.accessToken = token;
+    login.userId = (token) ? userId : undefined;    
     return res.status(200).json(login); // Успешный ответ
 
   } catch (error) {
