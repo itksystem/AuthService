@@ -18,6 +18,9 @@ const {VerificationCodeProcessStorage}  = require("../helpers/VerificationCodePr
 const logger = require('openfsm-logger-handler');
 const AuthError = require('openfsm-custom-error')
 
+const {TelegramAuth}  = require("../helpers/telegramHelper");
+const telegramAuth = new TelegramAuth();
+const CustomError = require("openfsm-custom-error");
 
 require('dotenv').config({ path: '.env-auth-service' });
 
@@ -28,6 +31,32 @@ exports.verificationCodeStorage = new VerificationCodeProcessStorage();  // по
 
 
 const { DateTime } = require('luxon');
+
+
+exports.telegramRegister = async (telegramId=null) => {
+  try {    
+    if (!telegramId) return null;
+
+    const _user = await userHelper.findByTelegramId(telegramId); // Проверяем наличие пользователя в БД
+    if (_user) return _user;
+    let password = await userHelper.emailVerificationLink();
+
+    const hashedPassword = await bcrypt.hash(password.substring(0, 16), 10); // Хэшируем пароль
+    if (!hashedPassword) throw new AuthError(500, MESSAGES[LANGUAGE].PASSWORD_HASHING_ERROR);    
+
+    const userId = await userHelper.telegramCreate(telegramId, hashedPassword); // Создаем нового пользователя
+    if (!userId) throw new AuthError(500, MESSAGES[LANGUAGE].USER_CREATION_ERROR);    
+    
+    const user = await userHelper.findById(userId); // Получаем данные нового пользователя
+    if (!user)  throw new AuthError(500, MESSAGES[LANGUAGE].USER_CREATION_ERROR);    
+    
+    await userHelper.setCustomerRole(user.getId(), common.USER_ROLES.CUSTOMER);    // Устанавливаем роль "Клиент"
+
+    return  user;    
+  } catch (error) {       
+    return null; 
+  }
+} 
 
 exports.register = async (req, res) => {
   try {
@@ -57,7 +86,7 @@ exports.register = async (req, res) => {
 };
 
 
-
+/* Авторизация через Web */
 exports.login = async (req, res) => {
   try {
    const { email, password } = req.body;
@@ -69,14 +98,13 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.getPassword()); // сравниваем хэш пароля, вынесли в отдельную функцию чтобы sql-inject снизить
     if (!isMatch) throw new AuthError(403,  commonFunction.getDescriptionByCode(403)); 
     
-    const token = jwt.sign({ id: user.getId() }, process.env.JWT_SECRET, { expiresIn: tokenExpiredTime}); // герерируем токен
+    const token = jwt.sign({ id: user.getId(), type: "login" }, process.env.JWT_SECRET, { expiresIn: tokenExpiredTime}); // герерируем токен
     res.status(200).json({ token })
 
   } catch (error) {    
     response.error(req, res, error); 
   }
 };
-
 
 exports.health = async (req, res) => {
   const startTime = DateTime.local(); // Отметка времени начала
@@ -108,29 +136,7 @@ exports.getPermissions = async (req, res) => {
       throw new AuthError(403, MESSAGES[LANGUAGE].USER_RIGHTS_MISSING);      
 
      return res.status(200).json({ userPermissions });
-   } catch (error) {
-    response.error(req, res, error); 
-  }
-};
-
-
-exports.getMe = async (req, res) => {
-  try {
-    const userId = req.user?.id;   
-    if (!userId)  throw new AuthError(400,  MESSAGES[LANGUAGE].USER_ID_MISSING );  // Проверка наличия userId
-    
-    const login = await userHelper.getMe(userId); // Получаем данные пользователя    
-    if (!login) throw new AuthError(402, MESSAGES[LANGUAGE].USER_NOT_FOUND  );  // Проверка наличия данных пользователя
-
-    const authHeader = req.headers['authorization'];
-    const tokenFromHeader = authHeader?.split(' ')[1] || null;    
-    const tokenFromCookies = req.cookies?.accessToken || null; // Получение токена из cookies    
-    const token = tokenFromHeader || tokenFromCookies; // Возврат токена из заголовка или cookies, если доступно
-    login.accessToken = token;
-    login.userId = (token) ? userId : undefined;    
-    return res.status(200).json(login); // Успешный ответ
-
-  } catch (error) {
+   } catch (error) {    
     response.error(req, res, error); 
   }
 };
@@ -144,7 +150,7 @@ exports.getToken = (req, res) => {
     const tokenFromCookies = req.cookies?.accessToken || null; // Получение токена из cookies    
     const token = tokenFromHeader || tokenFromCookies; // Возврат токена из заголовка или cookies, если доступно
     // Если токен отсутствует, возвращаем null
-    if (!token) return null;
+    if (!token || token == 'undefined') return null;
     return token;
   } catch (error) {    
     logger.error(MESSAGES[LANGUAGE].TOKEN_EXTRACTION_ERROR, error); // Логирование ошибки, если что-то пошло не так
@@ -154,19 +160,18 @@ exports.getToken = (req, res) => {
 
 
 exports.checkToken = async (req, res) => {
-  try {
+  try {       
     // Получаем токен
-      const token = exports.getToken(req, res);   
-      if (!token)  throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
-    
+      let  token = exports.getToken(req, res); 
+      if (!token)  throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));      
       if (exports.tokenBlacklist.has(token)) // Проверяем, находится ли токен в черном списке
-        throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
-     
+        throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));       
+
       const user = jwt.verify(token, process.env.JWT_SECRET); // Проверяем валидность токена
       if (!user) throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
 
       req.user = user; // Добавляем информацию о пользователе и токене в запрос
-      req.token = token;     
+      req.token = token;           
 
       return res.status(200).json({ user: req.user, token: req.token }); // Отправляем успешный ответ с данными пользователя и токена
 
@@ -280,6 +285,98 @@ exports.resendVerificationCode = async (req, res) => {
     await userHelper.sendMessage(userHelper.MAIL_QUEUE, userHelper.getNewVerificationCodeMail(user)); // Отправка письма с новым кодом    
     res.status(200).json({ status: true, message: MESSAGES[LANGUAGE].CODE_CHANGED_ENTER_NEW }); // Успешный ответ
   } catch (error) {
+    response.error(req, res, error); 
+  }
+};
+
+
+/* Сквозная авторизация через Telegram */
+exports.getTelegramPassThroughToken = async (req=null, res=null) => {
+  try {
+    if(!req || !res) return null;
+    const isAuthorized =  telegramAuth.isAuthorized(req, res) // проверка авторизации через Телеграм   
+    logger.info(`isAuthorized => ${isAuthorized}`);
+    if(!isAuthorized)  throw new AuthError(403,  commonFunction.getDescriptionByCode(403));     
+
+    const telegramId =  telegramAuth.getTelegramId(req, res) // проверка ваторизации через Телеграм   
+    logger.info(`telegramId => ${JSON.stringify(telegramId)}`);
+    if (!telegramId) throw new AuthError(403,  commonFunction.getDescriptionByCode(403));     
+
+    let user = await userHelper.findByTelegramId(telegramId);  // находим пользователя в БД по telegramId
+    logger.info(`user => ${user}`);
+    if (!user) {
+        user = await  exports.telegramRegister(telegramId); // регистрируем пользователя
+    }
+    if (!user)  throw new AuthError(403,  commonFunction.getDescriptionByCode(403));     
+
+    const token = jwt.sign({ id: user.getId(), type : "telegram" }, process.env.JWT_SECRET, { expiresIn: tokenExpiredTime}); // герерируем токен
+    logger.info(`token => ${token}`);
+    return token
+    
+  } catch (error) {    
+    logger.error(`getTelegramPassThroughToken.error => ${error}`);
+    return null
+  }
+};
+
+// Проверка на авторизацию через Telegram
+exports.getTelegramAuthorization  = async (req, res) => {
+  try {       
+    // Получаем токен
+      let  token = await exports.getTelegramPassThroughToken(req, res);       
+      const user = (token ? jwt.verify(token, process.env.JWT_SECRET) : undefined ); // Проверяем валидность токена
+      if(!user) throw(`checkTelegramAuthorization is not user`)
+      token = (user ? token : undefined )
+    return {user, token}
+    } catch (error) {
+    return null;
+  }
+};
+
+/* Процедура возвращает параметры авторизованного по*/
+exports.getMe = async (req, res) => {
+  try {
+    let login     = null;   
+    let _telegram = null;
+    let type      = null;
+    const authHeader = req.headers['authorization'];
+    const tokenFromHeader = authHeader?.split(' ')[1] || null;    
+    const tokenFromCookies = req.cookies?.accessToken || null;   // Получение токена из cookies    
+    let  token = tokenFromHeader || tokenFromCookies;            // Возврат токена из заголовка или cookies, если доступно   
+    const isTelegramAuth =  telegramAuth.isAuthorized(req, res)  // проверка авторизации через Телеграм   
+
+    if (!token || exports.tokenBlacklist.has(token)) {
+      token = null;
+      req.user  = null; 
+      req.token = token;             
+    } else {
+      jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      if (err) return null;
+      req.user = user; 
+      req.token = token;             
+     });  
+    } 
+   let userId =  req?.user?.id || null;      
+   if(!userId && isTelegramAuth) {  // пользователь не авторизован и зашел через Телеграм      
+      _telegram  = await exports.getTelegramAuthorization(req, res) // генерируем для него токен
+      userId     =  _telegram?.user?.id || null;
+      token      =  _telegram?.token || null;
+      type       =  _telegram?.user.type || null;
+   } 
+
+   if(!userId) throw(`getMe. Не определен userId`)  // пользователь остался не авторизованным - выдали ошибку
+
+   login = await userHelper.getMe(userId); // Получаем данные пользователя          
+   if(!login) throw(`getMe. Не найден пользователь ${login}`) // Не нашли 
+
+   login.userId         =  userId         || undefined; 
+   login.accessToken    =  token          || undefined; 
+   login.tokenType      =  type           || undefined;    
+   login.isTelegramAuth =  isTelegramAuth || undefined;
+
+   return res.status(200).json(login); // Успешный ответ
+
+  } catch (error) {    
     response.error(req, res, error); 
   }
 };
