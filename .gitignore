@@ -1,2 +1,5 @@
 .env*
 *.log
+pa_auth_service-error.log
+aaaa
+pa_auth_service-error.log
