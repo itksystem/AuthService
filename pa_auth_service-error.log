@@ -7,3 +7,4 @@
 {"level":"error","message":"getTelegramId.isAuthorized _data is null","service":"pa-auth-service","timestamp":"2025-03-13T17:36:09.536Z"}
 {"level":"error","message":"getTelegramId.isAuthorized _data is null","service":"pa-auth-service","timestamp":"2025-03-13T17:37:18.809Z"}
 {"level":"error","message":"getTelegramId.isAuthorized _data is null","service":"pa-auth-service","timestamp":"2025-03-13T17:39:55.560Z"}
+{"level":"error","message":"getTelegramId.isAuthorized _data is null","service":"pa-auth-service","timestamp":"2025-03-13T17:40:33.691Z"}
