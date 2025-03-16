@@ -18,8 +18,7 @@ exports.authenticateToken  = async (req, res, next) => {
   const cookies = req.cookies;  
   var  token = (authHeader && authHeader.split(' ')[1]) || (cookies && cookies.accessToken)   
   token = (token == 'undefined' ? null : token);
-  // если токена нет - проверить авторизацию через телеграм
-  logger.info(`token ${token} `);        
+  // если токена нет - проверить авторизацию через телеграм  
   if (!token) {
     logger.error(`not token!`);
     return res.sendStatus(401);
@@ -51,5 +50,5 @@ exports.getUserId  = (req, res) => {
       req.user = user; 
       req.token = token;       
    });  
-   return req.user.id;
+   return Number(req.user.id);
 };

@@ -9,7 +9,7 @@ exports.TelegramAuth = class  {
         if(!req) return null;
          let _initData = (req?.headers['x-tg-init-data']  ? req?.headers['x-tg-init-data'] : null);
          console.log(req?.headers);
-         console.log(`TelegramAuth.InitData => ${_initData}`);                 
+         console.log(`TelegramAuth.InitData =>`, _initData);                 
         return (!_initData || _initData == '') ? null : _initData;
       }  
       
@@ -34,11 +34,11 @@ exports.TelegramAuth = class  {
         initData.forEach((val, key) => key !== "hash" && dataToCheck.push(`${key}=${val}`));  
           const secret = CryptoJS.HmacSHA256(token, "WebAppData");
           const _hash  = CryptoJS.HmacSHA256(dataToCheck.join("\n"), secret).toString(CryptoJS.enc.Hex);
-          logger.info(`Получен hash =>${hash} расчитан _hash =>${_hash}`);        
-          logger.info(`isAuthorized => `+(_hash) === (hash));  
+          console.log(`Получен hash =>${hash} расчитан _hash =>${_hash}`);        
+          console.log(`isAuthorized => `,(_hash) === (hash));  
         return _hash === hash;        
       } catch (error) {
-        logger.error(`getTelegramId.isAuthorized ${error}`)
+        logger.error(`isAuthorized ${error}`)
         return false;
       }
    }
@@ -48,10 +48,13 @@ exports.TelegramAuth = class  {
     try {          
         if(!req) throw(`req is null`);    
         let initData = new URLSearchParams(this.InitData(req));
+        console.log(`getTelegramId=>`,initData)
         let user = JSON.parse(initData.get("user"));
+        console.log(`getTelegramId.user => `,user)
         if(!user) throw(`user is null`);      
-        logger.info(`getTelegramId => ${JSON.stringify(user)}`);  
-        if (user && user?.id) return user.id;   
+        console.log(`getTelegramId => `, user);  
+        if (user && user?.id) 
+          return user.id;   
     } catch (error) {            
       logger.error(`getTelegramId.error ${error}`)
     }
