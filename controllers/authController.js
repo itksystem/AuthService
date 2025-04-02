@@ -81,7 +81,8 @@ exports.login = async (req, res) => {
 
    // отправляем запрос на создание счета 
     try {
-        const accountRes = await userHelper.createAccounMessageSend(user.getId());  
+        let userId = user.getId();
+        const accountRes = await userHelper.createAccounMessageSend(userId);  
         if(!accountRes) throw('Send create account to bus error.... ')
      } catch (error) {
       logger.error(`telegramRegister =>`,error);
