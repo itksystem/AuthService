@@ -11,7 +11,7 @@ router.post('/v1/login', login);
 router.post('/v1/logout', logout);
 router.get('/v1/getPermissions', authMiddleware.authenticateToken, getPermissions);
 router.get('/v1/@me',  getMe);
-// router.post('/v1/checkToken', authMiddleware.authenticateToken, checkToken);
+router.post('/v1/checkToken', authMiddleware.authenticateToken, checkToken);
 router.post('/v1/setEmailUnverified', authMiddleware.authenticateToken, setEmailUnverified);
 // router.get('/v1/@telegram',  checkTelegramAuthorization);
 router.get('/v1/@telegram',  getMe);

@@ -86,7 +86,8 @@ exports.login = async (req, res) => {
         if(!accountRes) throw('Send create account to bus error.... ')
        } catch (error) {
       logger.error(`exports.login =>`,error);
-    }    
+    }
+    
     const token = jwt.sign({ id: user.getId(), type: "login" }, process.env.JWT_SECRET, { expiresIn: tokenExpiredTime}); // герерируем токен
     res.status(200).json({ token })
 
@@ -149,9 +150,8 @@ exports.getToken = (req, res) => {
 
 exports.checkToken = async (req, res) => {
   try {       
-    // Получаем токен    
+    // Получаем токен
       let  token = exports.getToken(req, res); 
-      console.log(`exports.checkToken=>`,token);
       if (!token)  throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));      
       if (exports.tokenBlacklist.has(token)) // Проверяем, находится ли токен в черном списке
         throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));       
@@ -161,11 +161,11 @@ exports.checkToken = async (req, res) => {
 
       req.user = user; // Добавляем информацию о пользователе и токене в запрос
       req.token = token;           
+
       return res.status(200).json({ user: req.user, token: req.token }); // Отправляем успешный ответ с данными пользователя и токена
 
   } catch (error) {
     // Добавляем токен в черный список, если ошибка связана с авторизацией
-    console.log(error);
     if ( (error instanceof CustomError) && error?.code === 401 && token) {
       exports.tokenBlacklist.add(token);
     }
@@ -296,53 +296,11 @@ function getTokenClaims(token){
 function createToken(user){
   return   jwt.sign({ 
     id: user?.getId(), 
-//    profile: user?.profileId, 
-    type : "telegram" 
-    },
+    profile: user?.profileId, 
+    type : "telegram" },
     process.env.JWT_SECRET, 
     { expiresIn: tokenExpiredTime}); // герерируем токен    
 }
-
-async function getTelegramUser(req = null){
-  try {          
-     if(!req) return null;
-      let initData = new URLSearchParams(telegramAuth.InitData(req));
-      let user = JSON.parse(initData.get("user"));
-      return user;
-    } catch (error) {
-     console.error('getTelegramUser.error:', error);
-   return null;
-  }  
-}
-
-async function getTelegramUserIdWithRegistration(telegramId){
-  let user = null;
-  try {          
-    if(!telegramId) return null;       
-    const userIdResp = await clientService.getUserIdByTelegramId(telegramId); // Получаем userId по telegramId
-    console.log('getTelegramUserIdWithRegistration.getUserIdByTelegramId response:', userIdResp);
-    if(!userIdResp?.data?.userId) {
-      user =  await exports.telegramRegister(telegramId);
-    } else 
-      user = await userHelper.findById(userIdResp.data.userId);
-      console.log(user);
-      if (!user) 
-          throw new Error('User not found or could not be registered');    
-
-    // Создаем профиль для пользователя
-    const profileIdResp = await clientService.createProfileByTelegramId(telegramId, user.getId());
-    console.log(profileIdResp);
-    if(!profileIdResp)
-      throw new Error('User profile not created');   
-      user.profileId = profileIdResp?.data?.profileId;
-
-  } catch (error) {
-    console.error('Telegram auth error:', error);
-    throw new Error(`Telegram auth failed: ${error.message}`);
-  }  
-  console.log(`getTelegramUserIdWithRegistration.return {user} =>`,user)
-  return user;
-}  
 
 
 exports.getMe = async (req, res) => {
@@ -354,39 +312,85 @@ exports.getMe = async (req, res) => {
     // Проверка авторизации через Telegram
     const telegramId = telegramAuth.getTelegramId(req, res);
     const isTelegramAuth = Boolean(telegramId);
-    let claims = getTokenClaims(token); // получили клаймы        
-    console.log(`me=>`,token,claims);
-    // Если пользователь зашел через Telegram    
+
+    // Если авторизация через Telegram
     if (telegramId) {
-          if (!isTokenValid(token) || !claims?.profile || !claims?.id) { // токен кривой или порсрочен
-          user = await getTelegramUserIdWithRegistration(telegramId)   // проводим проверку профиля или пересоздаем его
-          console.log(`user=>`,user);
-          token = createToken(user); // создали токен          
+      let claims = getTokenClaims(token);
+      console.log(claims);
+
+      // Обновляем параметры пользлователя при вызове метода @me
+      try {          
+          let initData = new URLSearchParams(telegramAuth.InitData(req));
+          let user = JSON.parse(initData.get("user"));
+          await clientService.updateProfileByTelegramId(user); 
+          } catch (error) {
+        console.error('tgProfileUpdateResponse.error:', error);
+      }      
+
+      // Если токен невалидный или отсутствуют необходимые claims
+      if (!isTokenValid(token) || !claims?.profile || !claims?.id) {
+        try {
+          // Получаем userId по telegramId
+          const userIdResp = await clientService.getUserIdByTelegramId(telegramId);
+          console.log('getUserIdByTelegramId response:', userIdResp);
+
+          // Если userId найден, ищем пользователя, иначе регистрируем нового
+          user = userIdResp?.data?.userId
+            ? await userHelper.findById(userIdResp.data.userId)
+            : await exports.telegramRegister(telegramId);
+
+          if (!user) {
+            throw new Error('User not found or could not be registered');
+          }
+
+          // Создаем профиль для пользователя
+          const profileIdResp = await clientService.createProfileByTelegramId(telegramId, user.getId());
+          console.log('Profile created:', profileIdResp);
+
+          // Создаем новый токен
+          user.profileId = profileIdResp?.data?.profileId;
+          token = createToken(user);
+          claims = getTokenClaims(token);
+        } catch (error) {
+          console.error('Telegram auth error:', error);
+          throw new Error(`Telegram auth failed: ${error.message}`);
         }      
-        let _user = await getTelegramUser(req);     
-        let _result = clientService.updateProfileByTelegramId(_user); // сохраняем или обнавляем параметрф телеграм-пользователя
-      } else { // пользователь зашел не через телеграм         
-        if (!isTokenValid(token) || !claims?.id) 
-          return res.status(401).json({ message: 'Authorization required' }); // ушли на авторизацию
       }
-     
-      claims = getTokenClaims(token); // получили клаймы    
-      // отправляем на создание счета 
-      try {        
-        const accountRes = await userHelper.createAccounMessageSend(claims.id);  
-        if(!accountRes) throw('Send create account to bus error.... ')
-       } catch (error) {
-        console.log(`exports.login =>`,error);
-      }    
-      user = (claims.id) ? await userHelper.findById(claims.id) :  null;      
-      login.userId = claims?.id  ?? undefined;;               
-      login.accessToken = token ?? undefined;
-      login.tokenType = claims?.type ?? undefined;
+      // получить 
+     try {
+//      const _me = await userHelper.getMe(userIdResp?.data?.userId);
+      const _me = await userHelper.getMe(user.getId());
+      console.log(`getMe=>`, _me);
+      if (!_me) {
+        throw new Error('User _me not initialized');
+      }          
+      login.isEmailConfirmed = _me.confirmed || undefined;
+     } catch (error) {
+       console.log(error);
+     }          
+      
+      // Заполняем объект login
+      login.userId = claims.id;         
+      user = (login.userId) 
+        ?  await userHelper.findById(login?.userId)   
+        :  null;
+      login.isEmailConfirmed = user?.getConfirmed() ?? undefined;
+
+      login.profileId = claims.profile;
+      login.accessToken = token;
+      login.tokenType = claims.type;
       login.isTelegramAuth = isTelegramAuth;
 
-      return res.status(200).json(login); // Успешный ответ    
+      return res.status(200).json(login); // Успешный ответ
+    }
+
+    // Если авторизация не через Telegram
+    return res.status(401).json({
+      message: 'Telegram authorization required',
+      login,
+    });
   } catch (error) {
-    console.log('authController.getMe error:', error);
+    console.error('authController.getMe error:', error);
     response.error(req, res, error);
   }
 };
