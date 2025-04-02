@@ -53,7 +53,7 @@ const { DateTime } = require('luxon');
 
     return  user;    
   } catch (error) {       
-    console.log(`telegramRegister =>`,error);
+    logger.error(`telegramRegister =>`,error);
     return null; 
   }
 } 
@@ -78,6 +78,14 @@ exports.login = async (req, res) => {
    
     const isMatch = await bcrypt.compare(password, user.getPassword()); // сравниваем хэш пароля, вынесли в отдельную функцию чтобы sql-inject снизить
     if (!isMatch) throw new AuthError(403,  commonFunction.getDescriptionByCode(403)); 
+
+   // отправляем запрос на создание счета 
+    try {
+        const accountRes = await userHelper.createAccounMessageSend(user.getId());  
+        if(!accountRes) throw('Send create account to bus error.... ')
+     } catch (error) {
+      logger.error(`telegramRegister =>`,error);
+    }
     
     const token = jwt.sign({ id: user.getId(), type: "login" }, process.env.JWT_SECRET, { expiresIn: tokenExpiredTime}); // герерируем токен
     res.status(200).json({ token })
@@ -143,12 +151,12 @@ exports.checkToken = async (req, res) => {
   try {       
     // Получаем токен
       let  token = exports.getToken(req, res); 
-      if (!token)  throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));      
+      if (!token)  throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));      
       if (exports.tokenBlacklist.has(token)) // Проверяем, находится ли токен в черном списке
-        throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));       
+        throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));       
 
       const user = jwt.verify(token, process.env.JWT_SECRET); // Проверяем валидность токена
-      if (!user) throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+      if (!user) throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
 
       req.user = user; // Добавляем информацию о пользователе и токене в запрос
       req.token = token;           
@@ -168,10 +176,10 @@ exports.checkToken = async (req, res) => {
 exports.logout = async (req, res) => {
   try {  
     const token = exports.getToken(req, res);  // Получаем токен
-    if (!token) throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    if (!token) throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
     
     if (exports.tokenBlacklist.has(token)) // Проверяем, находится ли токен в черном списке
-        throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+        throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
 
      exports.tokenBlacklist.add(token);    // Добавляем токен в черный список    
      return res.status(200).json({ message: MESSAGES[LANGUAGE].USER_LOGOUT }); // Возвращаем успешный ответ
