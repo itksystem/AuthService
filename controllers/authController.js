@@ -84,8 +84,8 @@ exports.login = async (req, res) => {
         let userId = user.getId();
         const accountRes = await userHelper.createAccounMessageSend(userId);  
         if(!accountRes) throw('Send create account to bus error.... ')
-     } catch (error) {
-      logger.error(`telegramRegister =>`,error);
+       } catch (error) {
+      logger.error(`exports.login =>`,error);
     }
     
     const token = jwt.sign({ id: user.getId(), type: "login" }, process.env.JWT_SECRET, { expiresIn: tokenExpiredTime}); // герерируем токен
@@ -358,7 +358,8 @@ exports.getMe = async (req, res) => {
       }
       // получить 
      try {
-      const _me = await userHelper.getMe(userIdResp?.data?.userId);
+//      const _me = await userHelper.getMe(userIdResp?.data?.userId);
+      const _me = await userHelper.getMe(user.getId());
       console.log(`getMe=>`, _me);
       if (!_me) {
         throw new Error('User _me not initialized');
