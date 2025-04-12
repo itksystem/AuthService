@@ -403,3 +403,30 @@ exports.setEmailUnverified = async (req, res) => {
     response.error(req, res, error); 
   }
 };
+
+
+// Цифровой код и второй фактор
+// список вопросов для второго фактора
+exports.getTwoFactorList = async (req, res) => {
+  try {    
+    const questions = await userHelper.getTwoFactorList();
+    if (!questions) throw new AuthError(500, MESSAGES[LANGUAGE].OPERATION_FAILED);  
+    res.status(200).json({ status: true, questions }); // Успешный ответ
+  } catch (error) {
+    response.error(req, res, error); 
+  }
+};
+
+// Установка второго фактора
+exports.setTwoFactor = async (req, res) => {
+  try {    
+    const userId = req.user.id;
+    const {factorId, factorText, factorKey} = req.body;
+    if (!userId) new AuthError(400,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    const questions = await userHelper.setTwoFactor(userId, factorId, factorText, factorKey);
+    if (!questions) throw new AuthError(500, MESSAGES[LANGUAGE].OPERATION_FAILED);  
+    res.status(200).json({ status: true, questions }); // Успешный ответ
+  } catch (error) {
+    response.error(req, res, error); 
+  }
+};
