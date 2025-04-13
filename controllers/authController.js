@@ -25,8 +25,11 @@ const CustomError = require("openfsm-custom-error");
 const ClientServiceHandler = require("openfsm-client-service-handler");
 const clientService = new ClientServiceHandler();              // интерфейс для  связи с MC AuthService
 
-require('dotenv').config({ path: '.env-auth-service' });
+const ConfirmationServiceHandler = require("openfsm-confirmation-service-handler");
+const confirmationService = new ConfirmationServiceHandler();   // интерфейс для  связи с MC ConfirmationService
 
+
+require('dotenv').config({ path: '.env-auth-service' });
 // Объявляем черный список токенов
 exports.tokenBlacklist = new Set();  // по хорошему стоит хранить их в отдельном хранилище, чтобы не потерять при перезагрузке приложения. Например в BD или в redis
 // Объявляем хранилище попыток отправки кода
@@ -421,11 +424,84 @@ exports.getTwoFactorList = async (req, res) => {
 exports.setTwoFactor = async (req, res) => {
   try {    
     const userId = req.user.id;
-    const {factorId, factorText, factorKey} = req.body;
-    if (!userId) new AuthError(400,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
-    const questions = await userHelper.setTwoFactor(userId, factorId, factorText, factorKey);
-    if (!questions) throw new AuthError(500, MESSAGES[LANGUAGE].OPERATION_FAILED);  
-    res.status(200).json({ status: true, questions }); // Успешный ответ
+    const {factorId, factorText, answerText, requestId} = req.body;
+    if (!userId) 
+      throw  new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
+    if (!factorId || !factorText || !answerText || !requestId) 
+      throw new AuthError(402,  commonFunction.getDescriptionByCode(Number(402) || 500 ));  
+    
+    const factor = await confirmationService.get2PARequestId(req);    
+    if(!factor?.data?.request?.requestId || factor?.data?.request?.attempts >= 3 )
+       new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
+
+    const factorHash = await bcrypt.hash(answerText.trim().toLowerCase(), 10);
+    const result = await userHelper.setTwoFactor(userId, factorId, factorText, factorHash);
+    if (!result) 
+      throw new AuthError(500, MESSAGES[LANGUAGE].OPERATION_FAILED);  
+      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "SUCCESS"}); 
+      res.status(200).json({ status: true }); // Успешный ответ
+  } catch (error) {    
+    response.error(req, res, error); 
+      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "ERROR"});
+  }
+};
+
+
+// Проверка второго фактора
+exports.checkTwoFactor = async (req, res) => {
+  try {    
+    const userId = req.user.id;
+    const {answerText} = req.body;
+    if (!userId)
+       new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+
+    const factor  = await userHelper.getTwoFactor(userId);    
+    const isMatch = await bcrypt.compare(answerText.trim().toLowerCase(), factor.factor_key); // сравниваем 
+    
+    if (!isMatch) 
+      throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);     
+      
+    res.status( (isMatch ? 200 : 403)).json({ status: isMatch }); // Успешный ответ
+  } catch (error) {
+    response.error(req, res, error); 
+  }
+};
+
+
+// Проверка акттивности второго фактора
+exports.getTwoFactorStatus = async (req, res) => {
+  try {    
+    const userId = req.user.id;    
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    const factor = await userHelper.getTwoFactor(userId);    
+    res.status(200).json({ status: (factor?.factor_key ? true : false) }); // Успешный ответ
+  } catch (error) {
+    response.error(req, res, error); 
+  }
+};
+
+
+// Получить идентификатор запроса для смены второго фактора или цифрового кода
+exports.get2PARequestId = async (req, res) => {
+  try {    
+    const userId = req.user.id;    
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    const factor = await confirmationService.get2PARequestId(userId);    
+    if (!factor?.requestId) throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);  
+    res.status(200).json({ status: true, requestId : factor?.requestId }); // Успешный ответ
+  } catch (error) {
+    response.error(req, res, error); 
+  }
+};
+
+// Обновить  идентификатор запроса для смены второго фактора или цифрового кода
+exports.update2PARequestId = async (req, res) => {
+  try {    
+    const userId = req.user.id;    
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    const factor = await confirmationService.update2PARequestId(userId);    
+    if (!factor?.requestId) throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);  
+    res.status(200).json({ status: (factor?.requestId ? true : false) }); // Успешный ответ
   } catch (error) {
     response.error(req, res, error); 
   }

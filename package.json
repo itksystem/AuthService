@@ -29,6 +29,8 @@
     "openfsm-common": "^1.0.7",
     "openfsm-common-auth-services": "^1.0.1",
     "openfsm-common-functions": "^1.0.1",
+    "openfsm-confirmation-helper": "^1.0.0",
+    "openfsm-confirmation-service-handler": "^1.0.0",
     "openfsm-custom-error": "^1.0.0",
     "openfsm-database-connection-producer": "^1.0.0",
     "openfsm-logger-handler": "^1.0.0",

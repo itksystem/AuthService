@@ -4,8 +4,13 @@ const { register, login, logout, health, getPermissions, checkToken,
     getMe, checkVerificationCode, resendVerificationCode, 
     checkTelegramAuthorization, 
     setTwoFactor,
-    getTwoFactorList, getDigitalCodeTwoFactor,
+    checkTwoFactor,
+    getTwoFactorList, 
+    getTwoFactorStatus,
+    getDigitalCodeTwoFactor,
+    get2PARequestId,
     setDigitalCode, getDigitalCodeExists,
+    
     setEmailUnverified } = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
 
@@ -24,12 +29,15 @@ router.post('/v1/checkCode', authMiddleware.authenticateToken, checkVerification
 router.post('/v1/resendCode', authMiddleware.authenticateToken, resendVerificationCode);
 
 // установка цифрового кода для Телеграм
-// router.post('/v1/digital-code', authMiddleware.authenticateToken, setDigitalCode); // установка кода
-// router.get('/v1/digital-code-exists', authMiddleware.authenticateToken, getDigitalCodeExists);  // получение информации о наличии кода
+ // router.post('/v1/digital-code', authMiddleware.authenticateToken, setDigitalCode); // установка кода
+ // router.get('/v1/digital-code-exists', authMiddleware.authenticateToken, getDigitalCodeExists);  // получение информации о наличии кода
 
-// второй фактор
+// второй фактор - контрольный вопрос / ответ
 router.get('/v1/two-factors', getTwoFactorList);  // получение информации об справочнике кодов второго фактора - вопросы
 router.post('/v1/two-factor', authMiddleware.authenticateToken, setTwoFactor);  // установка второго фактора
+router.post('/v1/two-factor-check', authMiddleware.authenticateToken, checkTwoFactor);  // установка второго фактора
+router.get('/v1/two-factor-status', authMiddleware.authenticateToken, getTwoFactorStatus);  // проверка активности второго фактора
+router.get('/v1/2pa-request', authMiddleware.authenticateToken, get2PARequestId);  // Получение идентификатора запроса
 
 
 
