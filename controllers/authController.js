@@ -480,6 +480,18 @@ exports.getTwoFactorStatus = async (req, res) => {
   }
 };
 
+// Проверка акттивности второго фактора
+exports.getPinCodeFactorStatus = async (req, res) => {
+  try {    
+    const userId = req.user.id;    
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    const factor = await userHelper.getPinCodeFactor(userId);    
+    res.status(200).json({ status: (factor?.pinCode ? true : false) }); // Успешный ответ
+  } catch (error) {
+    response.error(req, res, error); 
+  }
+};
+
 
 // Получить идентификатор запроса для смены второго фактора или цифрового кода
 exports.get2PARequestId = async (req, res) => {

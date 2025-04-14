@@ -13,6 +13,7 @@ const { register, login, logout, health, getPermissions, checkToken,
     
     setEmailUnverified } = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { getPinCodeFactor } = require('openfsm-user-helper');
 
 router.post('/v1/register', register);
 router.post('/v1/login', login);
@@ -37,6 +38,7 @@ router.get('/v1/two-factors', getTwoFactorList);  // получение инфо
 router.post('/v1/two-factor', authMiddleware.authenticateToken, setTwoFactor);  // установка второго фактора
 router.post('/v1/two-factor-check', authMiddleware.authenticateToken, checkTwoFactor);  // установка второго фактора
 router.get('/v1/two-factor-status', authMiddleware.authenticateToken, getTwoFactorStatus);  // проверка активности второго фактора
+router.get('/v1/pin-code-status', authMiddleware.authenticateToken, getPinCodeFactor);  // проверка активности второго фактора
 router.get('/v1/2pa-request', authMiddleware.authenticateToken, get2PARequestId);  // Получение идентификатора запроса
 
 
