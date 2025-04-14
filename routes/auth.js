@@ -9,9 +9,12 @@ const { register, login, logout, health, getPermissions, checkToken,
     getTwoFactorStatus,
     getDigitalCodeTwoFactor,
     get2PARequestId,
+    getSecurityQuestion,
+    getSecurityAnswer,
     setDigitalCode, getDigitalCodeExists,
     
-    setEmailUnverified } = require('../controllers/authController');
+    setEmailUnverified, 
+    getPinCodeFactorStatus} = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { getPinCodeFactor } = require('openfsm-user-helper');
 
@@ -37,10 +40,14 @@ router.post('/v1/resendCode', authMiddleware.authenticateToken, resendVerificati
 router.get('/v1/two-factors', getTwoFactorList);  // получение информации об справочнике кодов второго фактора - вопросы
 router.post('/v1/two-factor', authMiddleware.authenticateToken, setTwoFactor);  // установка второго фактора
 router.post('/v1/two-factor-check', authMiddleware.authenticateToken, checkTwoFactor);  // установка второго фактора
+//
 router.get('/v1/two-factor-status', authMiddleware.authenticateToken, getTwoFactorStatus);  // проверка активности второго фактора
-router.get('/v1/pin-code-status', authMiddleware.authenticateToken, getPinCodeFactor);  // проверка активности второго фактора
+router.get('/v1/pin-code-status', authMiddleware.authenticateToken, getPinCodeFactorStatus);  // проверка активности второго фактора
+//
 router.get('/v1/2pa-request', authMiddleware.authenticateToken, get2PARequestId);  // Получение идентификатора запроса
-
+//
+router.get('/v1/security-question', authMiddleware.authenticateToken, getSecurityQuestion);  // получить контрольный вопрос
+router.post('/v1/security-question-answer', authMiddleware.authenticateToken, getSecurityAnswer);  // Проверить вопрос
 
 
 module.exports = router;

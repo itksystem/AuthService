@@ -453,7 +453,7 @@ exports.checkTwoFactor = async (req, res) => {
     const userId = req.user.id;
     const {answerText} = req.body;
     if (!userId)
-       new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+       new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
 
     const factor  = await userHelper.getTwoFactor(userId);    
     const isMatch = await bcrypt.compare(answerText.trim().toLowerCase(), factor.factor_key); // сравниваем 
@@ -472,7 +472,7 @@ exports.checkTwoFactor = async (req, res) => {
 exports.getTwoFactorStatus = async (req, res) => {
   try {    
     const userId = req.user.id;    
-    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
     const factor = await userHelper.getTwoFactor(userId);    
     res.status(200).json({ status: (factor?.factor_key ? true : false) }); // Успешный ответ
   } catch (error) {
@@ -484,7 +484,7 @@ exports.getTwoFactorStatus = async (req, res) => {
 exports.getPinCodeFactorStatus = async (req, res) => {
   try {    
     const userId = req.user.id;    
-    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
     const factor = await userHelper.getPinCodeFactor(userId);    
     res.status(200).json({ status: (factor?.pinCode ? true : false) }); // Успешный ответ
   } catch (error) {
@@ -497,7 +497,7 @@ exports.getPinCodeFactorStatus = async (req, res) => {
 exports.get2PARequestId = async (req, res) => {
   try {    
     const userId = req.user.id;    
-    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
     const factor = await confirmationService.get2PARequestId(userId);    
     if (!factor?.requestId) throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);  
     res.status(200).json({ status: true, requestId : factor?.requestId }); // Успешный ответ
@@ -510,10 +510,41 @@ exports.get2PARequestId = async (req, res) => {
 exports.update2PARequestId = async (req, res) => {
   try {    
     const userId = req.user.id;    
-    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(error) || 500 ));  
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
     const factor = await confirmationService.update2PARequestId(userId);    
     if (!factor?.requestId) throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);  
     res.status(200).json({ status: (factor?.requestId ? true : false) }); // Успешный ответ
+  } catch (error) {
+    response.error(req, res, error); 
+  }
+};
+
+// Обновить  идентификатор запроса для смены второго фактора или цифрового кода
+exports.getSecurityQuestion = async (req, res) => {
+  try {    
+    const userId = req.user.id;    
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
+    const question = await userHelper.getSecurityQuestion(userId);    
+    if (!question?.text)
+       throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);  
+    res.status(200).json({ status: (question?.text ? true : false), question }); // Успешный ответ
+  } catch (error) {
+    response.error(req, res, error); 
+  }
+};
+
+// Обновить  идентификатор запроса для смены второго фактора или цифрового кода
+exports.getSecurityAnswer = async (req, res) => {
+  try {    
+    const userId = req.user.id;    
+    const {answer} = req.body;
+    if(!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
+    if(!answer) new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
+    const factor = await userHelper.getSecurityAnswer(userId);    
+    const isMatch = await bcrypt.compare(answer.trim().toLowerCase(), factor.factor_key); // сравниваем     
+    if (!isMatch) 
+      throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);           
+    res.status( (isMatch ? 200 : 403)).json({ status: isMatch }); // Успешный ответ    
   } catch (error) {
     response.error(req, res, error); 
   }
