@@ -538,12 +538,18 @@ exports.getSecurityAnswer = async (req, res) => {
   try {    
     const userId = req.user.id;    
     const {answer} = req.body;
+    const {requestId} = req.body;
     if(!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
-    if(!answer) new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
+    if(!answer || !requestId) new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
+
     const factor = await userHelper.getSecurityAnswer(userId);    
     const isMatch = await bcrypt.compare(answer.trim().toLowerCase(), factor.factor_key); // сравниваем     
-    if (!isMatch) 
-      throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);           
+
+    if (!isMatch) {
+      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "FAILED"}); 
+      throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);            
+    }    
+    await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "SUCCESS"}); 
     res.status( (isMatch ? 200 : 403)).json({ status: isMatch }); // Успешный ответ    
   } catch (error) {
     response.error(req, res, error); 
