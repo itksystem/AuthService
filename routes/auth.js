@@ -43,11 +43,14 @@ router.post('/v1/two-factor-check', authMiddleware.authenticateToken, checkTwoFa
 //
 router.get('/v1/two-factor-status', authMiddleware.authenticateToken, getTwoFactorStatus);  // проверка активности второго фактора
 router.get('/v1/pin-code-status', authMiddleware.authenticateToken, getPinCodeFactorStatus);  // проверка активности второго фактора
+
 //
 router.get('/v1/2pa-request', authMiddleware.authenticateToken, get2PARequestId);  // Получение идентификатора запроса
-//
+
+//работа с контрольными вопросами
 router.get('/v1/security-question', authMiddleware.authenticateToken, getSecurityQuestion);  // получить контрольный вопрос
 router.post('/v1/security-question-answer', authMiddleware.authenticateToken, getSecurityAnswer);  // Проверить вопрос
+
 
 
 module.exports = router;

@@ -535,23 +535,28 @@ exports.getSecurityQuestion = async (req, res) => {
 
 // Обновить  идентификатор запроса для смены второго фактора или цифрового кода
 exports.getSecurityAnswer = async (req, res) => {
+  const userId = req.user.id;    
+  const {answer} = req.body;
+  const {requestId} = req.body;
+  const {action} = req.body; // DISABLE_SECURITY_QUESTION, ENABLE_SECURITY_QUESTION, DISABLE_PIN_CODE, ENABLE_PIN_CODE
   try {    
-    const userId = req.user.id;    
-    const {answer} = req.body;
-    const {requestId} = req.body;
     if(!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
     if(!answer || !requestId) new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
 
     const factor = await userHelper.getSecurityAnswer(userId);    
     const isMatch = await bcrypt.compare(answer.trim().toLowerCase(), factor.factor_key); // сравниваем     
 
-    if (!isMatch) {
-      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "FAILED"}); 
-      throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);            
-    }    
-    await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "SUCCESS"}); 
-    res.status( (isMatch ? 200 : 403)).json({ status: isMatch }); // Успешный ответ    
+    if (!isMatch)  
+      throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE); // пароль не совпал 
+    
+    let disableResult = await userHelper.disableSecurityQuestion(userId); // отключаем контрольный вопрос
+    if(!disableResult?.blocked) 
+       throw(422);
+       await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{action, userId, requestId, "status" : "SUCCESS"});  // шлем в МС Подтверждений информацию
+
+       res.status( (isMatch ? 200 : 403)).json({ status: isMatch }); // Успешный ответ    
   } catch (error) {
-    response.error(req, res, error); 
+       await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "FAILED"});     // шлем ошибку
+       response.error(req, res, error); 
   }
 };
