@@ -12,7 +12,7 @@ const { register, login, logout, health, getPermissions, checkToken,
     getSecurityQuestion,
     getSecurityAnswer,
     setDigitalCode, getDigitalCodeExists,
-    
+    securityQuestionAnswer,    
     setEmailUnverified, 
     getPinCodeFactorStatus} = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
@@ -49,7 +49,7 @@ router.get('/v1/2pa-request', authMiddleware.authenticateToken, get2PARequestId)
 
 //работа с контрольными вопросами
 router.get('/v1/security-question', authMiddleware.authenticateToken, getSecurityQuestion);  // получить контрольный вопрос
-router.post('/v1/security-question-answer', authMiddleware.authenticateToken, getSecurityAnswer);  // Проверить вопрос
+router.post('/v1/security-question-answer', authMiddleware.authenticateToken, securityQuestionAnswer);  // Проверить вопрос
 
 
 

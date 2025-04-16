@@ -533,27 +533,44 @@ exports.getSecurityQuestion = async (req, res) => {
   }
 };
 
-// Обновить  идентификатор запроса для смены второго фактора или цифрового кода
-exports.getSecurityAnswer = async (req, res) => {
+//  Проверка кода и выполнение операции DISABLE_SECURITY_QUESTION, ENABLE_SECURITY_QUESTION, DISABLE_PIN_CODE, ENABLE_PIN_CODE
+exports.securityQuestionAnswer = async (req, res) => {
   const userId = req.user.id;    
-  const {answer} = req.body;
-  const {requestId} = req.body;
-  const {action} = req.body; // DISABLE_SECURITY_QUESTION, ENABLE_SECURITY_QUESTION, DISABLE_PIN_CODE, ENABLE_PIN_CODE
+  const {answer, requestId, action} = req.body;  
   try {    
     if(!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
-    if(!answer || !requestId) new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
+    if(!answer || !requestId || !action)  new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
 
     const factor = await userHelper.getSecurityAnswer(userId);    
     const isMatch = await bcrypt.compare(answer.trim().toLowerCase(), factor.factor_key); // сравниваем     
 
     if (!isMatch)  
       throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE); // пароль не совпал 
-    
-    let disableResult = await userHelper.disableSecurityQuestion(userId); // отключаем контрольный вопрос
-    if(!disableResult?.blocked) 
-       throw(422);
-       await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{action, userId, requestId, "status" : "SUCCESS"});  // шлем в МС Подтверждений информацию
 
+    switch(action){
+       case 'DISABLE_SECURITY_QUESTION' : {
+        let disableResult = await userHelper.disableSecurityQuestion(userId); // отключаем контрольный вопрос
+        if(!disableResult?.blocked) 
+         throw(422);
+         break;
+      }
+      case 'DISABLE_PIN_CODE' : {
+        let disableResult = await userHelper.disablePINCodeQuestion(userId); // отключаем пин-код
+        if(!disableResult?.blocked) 
+         throw(422);
+         break;
+      }
+
+      case 'ENABLE_SECURITY_QUESTION' : {      
+         break;
+      }
+      
+      case 'ENABLE_PIN_CODE' : {      
+        break;
+     }
+
+    }    
+       await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "SUCCESS"});  // шлем в МС Подтверждений информацию
        res.status( (isMatch ? 200 : 403)).json({ status: isMatch }); // Успешный ответ    
   } catch (error) {
        await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "FAILED"});     // шлем ошибку
