@@ -422,12 +422,12 @@ exports.getTwoFactorList = async (req, res) => {
 
 // Установка второго фактора
 exports.setTwoFactor = async (req, res) => {
+  const userId = req.user.id;
+  const {factorId, factorText, answerText, requestId} = req.body;
   try {    
-    const userId = req.user.id;
-    const {factorId, factorText, answerText, requestId} = req.body;
     if (!userId) 
       throw  new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
-    if (!factorId || !factorText || !answerText || !requestId) 
+    if (!answerText || !requestId) 
       throw new AuthError(402,  commonFunction.getDescriptionByCode(Number(402) || 500 ));  
     
     const factor = await confirmationService.get2PARequestId(req);    
@@ -525,8 +525,6 @@ exports.getSecurityQuestion = async (req, res) => {
     const userId = req.user.id;    
     if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
     const question = await userHelper.getSecurityQuestion(userId);    
-    if (!question?.text)
-       throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE);  
     res.status(200).json({ status: (question?.text ? true : false), question }); // Успешный ответ
   } catch (error) {
     response.error(req, res, error); 
