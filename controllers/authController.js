@@ -480,18 +480,6 @@ exports.getTwoFactorStatus = async (req, res) => {
   }
 };
 
-// Проверка акттивности второго фактора
-exports.getPinCodeFactorStatus = async (req, res) => {
-  try {    
-    const userId = req.user.id;    
-    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
-    const factor = await userHelper.getPinCodeFactor(userId);    
-    res.status(200).json({ status: (factor?.pinCode ? true : false) }); // Успешный ответ
-  } catch (error) {
-    response.error(req, res, error); 
-  }
-};
-
 
 // Получить идентификатор запроса для смены второго фактора или цифрового кода
 exports.get2PARequestId = async (req, res) => {
@@ -531,7 +519,7 @@ exports.getSecurityQuestion = async (req, res) => {
   }
 };
 
-//  Проверка кода и выполнение операции DISABLE_SECURITY_QUESTION, ENABLE_SECURITY_QUESTION, DISABLE_PIN_CODE, ENABLE_PIN_CODE
+//  Проверка кода и выполнение операции DISABLE_SECURITY_QUESTION, ENABLE_SECURITY_QUESTION
 exports.securityQuestionAnswer = async (req, res) => {
   const userId = req.user.id;    
   const {answer, requestId, action} = req.body;  
@@ -552,17 +540,111 @@ exports.securityQuestionAnswer = async (req, res) => {
          throw(422);
          break;
       }
+   
+      case 'ENABLE_SECURITY_QUESTION' : {      
+         break;
+      }
+ 
+    }    
+       await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "SUCCESS"});  // шлем в МС Подтверждений информацию
+       res.status( (isMatch ? 200 : 403)).json({ status: isMatch }); // Успешный ответ    
+  } catch (error) {
+       await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "FAILED"});     // шлем ошибку
+       response.error(req, res, error); 
+  }
+};
+
+
+// Проверка акттивности второго фактора
+exports.getPinCodeFactorStatus = async (req, res) => {
+  try {    
+    const userId = req.user.id;    
+    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
+    const factor = await userHelper.getPinCodeFactor(userId);    
+    res.status(200).json({ status: (factor?.pinCode ? true : false) }); // Успешный ответ
+  } catch (error) {
+    response.error(req, res, error); 
+  }
+};
+
+
+// Установка PIN-кода
+exports.enablePinCode = async (req, res) => {
+  const userId = req.user.id;
+  const {pinCode, requestId} = req.body;
+  try {    
+    if (!userId) 
+      throw  new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
+    if (!pinCode) 
+      throw new AuthError(402,  commonFunction.getDescriptionByCode(Number(402) || 500 ));  
+    
+    const factor = await confirmationService.get2PARequestId(req);    
+    if(!factor?.data?.request?.requestId || factor?.data?.request?.attempts >= 3 )
+       new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
+
+    const pinCodeHash = await bcrypt.hash(pinCode.trim().toLowerCase(), 10);
+    const result = await userHelper.enablePinCode(userId, pinCodeHash);
+    if (!result) 
+      throw new AuthError(500, MESSAGES[LANGUAGE].OPERATION_FAILED);  
+      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "SUCCESS"}); 
+      res.status(200).json({ status: true }); // Успешный ответ
+  } catch (error) {    
+      response.error(req, res, error); 
+      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "ERROR"});
+  }
+};
+
+
+// Удаление PIN-кода
+exports.disablePinCode = async (req, res) => {
+  const userId = req.user.id;
+  const {requestId} = req.body;
+  try {    
+    if (!userId) 
+      throw  new AuthError(401, commonFunction.getDescriptionByCode(Number(401) || 500 ));  
+    if (!pinCode) 
+      throw new AuthError(402, commonFunction.getDescriptionByCode(Number(402) || 500 ));  
+    
+    const factor = await confirmationService.get2PARequestId(req);    
+    if(!factor?.data?.request?.requestId || factor?.data?.request?.attempts >= 3 )
+       new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
+    
+    const result = await userHelper.disablePinCode(userId);
+    if (!result) 
+      throw new AuthError(500, MESSAGES[LANGUAGE].OPERATION_FAILED);  
+      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "SUCCESS"}); 
+      res.status(200).json({ status: true }); // Успешный ответ
+  } catch (error) {    
+      response.error(req, res, error); 
+      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "ERROR"});
+  }
+};
+
+
+
+
+//  Проверка пин-кода и выполнение операции DISABLE_PIN_CODE, ENABLE_PIN_CODE
+exports.checkPinCode = async (req, res) => {
+  const userId = req.user.id;    
+  const {answer, requestId, action} = req.body;  
+  try {    
+    if(!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
+    if(!answer || !requestId || !action)  new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
+
+    const factor = await userHelper.getSecurityAnswer(userId);    
+    const isMatch = await bcrypt.compare(answer.trim().toLowerCase(), factor.factor_key); // сравниваем     
+
+    if (!isMatch)  
+      throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE); // пароль не совпал 
+
+    switch(action){
       case 'DISABLE_PIN_CODE' : {
         let disableResult = await userHelper.disablePINCodeQuestion(userId); // отключаем пин-код
         if(!disableResult?.blocked) 
          throw(422);
          break;
       }
-
-      case 'ENABLE_SECURITY_QUESTION' : {      
-         break;
-      }
-      
+            
       case 'ENABLE_PIN_CODE' : {      
         break;
      }
