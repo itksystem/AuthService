@@ -31,19 +31,19 @@ router.post('/v1/checkCode', authMiddleware.authenticateToken, checkVerification
 router.post('/v1/resendCode', authMiddleware.authenticateToken, resendVerificationCode);
 
 // второй фактор - контрольный вопрос / ответ
-router.get('/v1/two-factors', getTwoFactorList);  // получение информации об справочнике кодов второго фактора - вопросы
+// router.get('/v1/two-factors', getTwoFactorList);  // получение информации об справочнике кодов второго фактора - вопросы
 
 // установка вопроса 
 router.post('/v1/pin-code-enable', authMiddleware.authenticateToken, enablePinCode);  // установка пин-кода
 router.post('/v1/pin-code-disable', authMiddleware.authenticateToken, disablePinCode);  // отключение пин-кода
 
 router.post('/v1/pin-code-check', authMiddleware.authenticateToken, checkPinCode);  // проверка введенного пин-кода
-router.post('/v1/two-factor', authMiddleware.authenticateToken, setTwoFactor);  // установка контрольного вопроса
+//router.post('/v1/two-factor', authMiddleware.authenticateToken, setTwoFactor);  // установка контрольного вопроса
 
 // router.post('/v1/two-factor-check', authMiddleware.authenticateToken, checkTwoFactor);  // установка второго фактора
 
 // получение статусов
-router.get('/v1/two-factor-status', authMiddleware.authenticateToken, getTwoFactorStatus);  // проверка активности второго фактора
+// router.get('/v1/two-factor-status', authMiddleware.authenticateToken, getTwoFactorStatus);  // проверка активности второго фактора
 router.get('/v1/pin-code-status', authMiddleware.authenticateToken, getPinCodeFactorStatus);  // проверка активности второго фактора
 
 // получение requestId от сервиса подтверждения
@@ -51,7 +51,7 @@ router.get('/v1/pin-code-status', authMiddleware.authenticateToken, getPinCodeFa
 
 //работа с контрольными вопросами
 router.get('/v1/security-question', authMiddleware.authenticateToken, getSecurityQuestion);  // получить контрольный вопрос
-router.post('/v1/security-question-answer', authMiddleware.authenticateToken, securityQuestionAnswer);  // Проверить вопрос
+// router.post('/v1/security-question-answer', authMiddleware.authenticateToken, securityQuestionAnswer);  // Проверить вопрос
 
 
 

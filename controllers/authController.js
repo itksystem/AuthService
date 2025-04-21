@@ -73,7 +73,7 @@ exports.login = async (req, res) => {
    const { email, password } = req.body;
    if (!email || !password)  throw new AuthError(400, MESSAGES[LANGUAGE].EMAIL_AND_PASSWORD_REQUIRED);   
 
-    const response = await clientService.getUserIdByEmail(req);        
+    let response = await clientService.getUserIdByEmail(req);        
     if(!response?.data?.userId) throw new AuthError(422, MESSAGES[LANGUAGE].USER_NOT_FOUND); //  ищем id пользователя по email
     
     const user = await userHelper.findById(response?.data?.userId);  // находим пользователя в БД
@@ -410,6 +410,8 @@ exports.setEmailUnverified = async (req, res) => {
 
 // Цифровой код и второй фактор
 // список вопросов для второго фактора
+
+/*
 exports.getTwoFactorList = async (req, res) => {
   try {    
     const questions = await userHelper.getTwoFactorList();
@@ -419,8 +421,10 @@ exports.getTwoFactorList = async (req, res) => {
     response.error(req, res, error); 
   }
 };
+*/
 
 // Установка второго фактора
+/*
 exports.setTwoFactor = async (req, res) => {
   const userId = req.user.id;
   const {factorId, factorText, answerText, requestId} = req.body;
@@ -445,7 +449,7 @@ exports.setTwoFactor = async (req, res) => {
       await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "ERROR"});
   }
 };
-
+*/
 
 // Проверка второго фактора
 exports.checkTwoFactor = async (req, res) => {
@@ -469,6 +473,7 @@ exports.checkTwoFactor = async (req, res) => {
 
 
 // Проверка акттивности второго фактора
+/*
 exports.getTwoFactorStatus = async (req, res) => {
   try {    
     const userId = req.user.id;    
@@ -479,7 +484,7 @@ exports.getTwoFactorStatus = async (req, res) => {
     response.error(req, res, error); 
   }
 };
-
+*/
 
 // Получить идентификатор запроса для смены второго фактора или цифрового кода
 exports.get2PARequestId = async (req, res) => {
