@@ -50,8 +50,8 @@ router.get('/v1/pin-code-status', authMiddleware.authenticateToken, getPinCodeFa
 // router.get('/v1/2pa-request', authMiddleware.authenticateToken, get2PARequestId);  // Получение идентификатора запроса
 
 //работа с контрольными вопросами
-router.get('/v1/security-question', authMiddleware.authenticateToken, getSecurityQuestion);  // получить контрольный вопрос
-// router.post('/v1/security-question-answer', authMiddleware.authenticateToken, securityQuestionAnswer);  // Проверить вопрос
+//router.get('/v1/security-question', authMiddleware.authenticateToken, getSecurityQuestion);  // получить контрольный вопрос
+ //router.post('/v1/security-question-answer', authMiddleware.authenticateToken, securityQuestionAnswer);  // Проверить вопрос
 
 
 
