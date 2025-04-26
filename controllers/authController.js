@@ -299,8 +299,9 @@ function getTokenClaims(token){
 function createToken(user){
   return   jwt.sign({ 
     id: user?.getId(), 
-//    profile: user?.profileId, 
-    type : "telegram" 
+    type : "telegram", 
+    pin : user?.pinCodeEnabled ?? undefined,
+    pchk: user?.pinCodeChecked ?? undefined,
     },
     process.env.JWT_SECRET, 
     { expiresIn: tokenExpiredTime}); // герерируем токен    
@@ -347,8 +348,28 @@ async function getTelegramUserIdWithRegistration(telegramId){
   return user;
 }  
 
+// Проверка вторым фактором 
+exports.pinCodeLogon = async (req, res) => {
+  const userId = req.user.id;    
+  const {code} = req.body;  
+  let isMatch = false;
+  try {    
+    if(!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
+    if(!code)   new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
 
-exports.getMe = async (req, res) => {
+    const factor = await userHelper.getPinCodeFactor(userId);    
+    isMatch = await bcrypt.compare(code.trim().toLowerCase(), factor.pinCode); // сравниваем     
+    if (!isMatch)  
+      throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE); // пароль не совпал 
+    console.log(`pinCodeLogon =>`,isMatch);
+  } catch (error) {
+    console.log(`pinCodeLogon =>`,error);
+  }
+  exports.getMe(req, res, isMatch) 
+};
+
+
+exports.getMe = async (req, res, pinChecked = null ) => {
   try {
     let login = {};
     let token = exports.getToken(req, res);
@@ -359,10 +380,18 @@ exports.getMe = async (req, res) => {
     const isTelegramAuth = Boolean(telegramId);
     let claims = getTokenClaims(token); // получили клаймы        
     console.log(`me=>`,token,claims);
+   
+  
+
     // Если пользователь зашел через Telegram    
     if (telegramId) {
           if (!isTokenValid(token) || !claims?.profile || !claims?.id) { // токен кривой или порсрочен
           user = await getTelegramUserIdWithRegistration(telegramId)   // проводим проверку профиля или пересоздаем его
+
+          const factor = await userHelper.getPinCodeFactor(user?.getId());              
+          user.pinCodeEnabled = (factor?.pinCode ? true : false);
+          user.pinCodeChecked = pinChecked ?? (claims.pchk ?? false);     // проверяем прошел ли пользователь авторизацию пин-кодом
+
           console.log(`user=>`,user);
           token = createToken(user); // создали токен          
         }      
@@ -385,6 +414,8 @@ exports.getMe = async (req, res) => {
       login.userId = claims?.id  ?? undefined;;               
       login.accessToken = token ?? undefined;
       login.tokenType = claims?.type ?? undefined;
+      login.pinCodeEnabled = claims?.pin ?? undefined;
+      login.pinCodeChecked = claims?.pchk ?? undefined;
       login.isTelegramAuth = isTelegramAuth;
 
       return res.status(200).json(login); // Успешный ответ    
@@ -408,49 +439,6 @@ exports.setEmailUnverified = async (req, res) => {
 };
 
 
-// Цифровой код и второй фактор
-// список вопросов для второго фактора
-
-/*
-exports.getTwoFactorList = async (req, res) => {
-  try {    
-    const questions = await userHelper.getTwoFactorList();
-    if (!questions) throw new AuthError(500, MESSAGES[LANGUAGE].OPERATION_FAILED);  
-    res.status(200).json({ status: true, questions }); // Успешный ответ
-  } catch (error) {
-    response.error(req, res, error); 
-  }
-};
-*/
-
-// Установка второго фактора
-/*
-exports.setTwoFactor = async (req, res) => {
-  const userId = req.user.id;
-  const {factorId, factorText, answerText, requestId} = req.body;
-  try {    
-    if (!userId) 
-      throw  new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
-    if (!answerText || !requestId) 
-      throw new AuthError(402,  commonFunction.getDescriptionByCode(Number(402) || 500 ));  
-    
-    const factor = await confirmationService.get2PARequestId(req);    
-    if(!factor?.data?.request?.requestId || factor?.data?.request?.attempts >= 3 )
-       new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
-
-    const factorHash = await bcrypt.hash(answerText.trim().toLowerCase(), 10);
-    const result = await userHelper.setTwoFactor(userId, factorId, factorText, factorHash);
-    if (!result) 
-      throw new AuthError(500, MESSAGES[LANGUAGE].OPERATION_FAILED);  
-      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "SUCCESS"}); 
-      res.status(200).json({ status: true }); // Успешный ответ
-  } catch (error) {    
-    response.error(req, res, error); 
-      await userHelper.sendMessage(userHelper.TWO_PA_CHANGE_STATUS_QUEUE,{userId, requestId, "status" : "ERROR"});
-  }
-};
-*/
-
 // Проверка второго фактора
 exports.checkTwoFactor = async (req, res) => {
   try {    
@@ -472,19 +460,6 @@ exports.checkTwoFactor = async (req, res) => {
 };
 
 
-// Проверка акттивности второго фактора
-/*
-exports.getTwoFactorStatus = async (req, res) => {
-  try {    
-    const userId = req.user.id;    
-    if (!userId) new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
-    const factor = await userHelper.getTwoFactor(userId);    
-    res.status(200).json({ status: (factor?.factor_key ? true : false) }); // Успешный ответ
-  } catch (error) {
-    response.error(req, res, error); 
-  }
-};
-*/
 
 // Получить идентификатор запроса для смены второго фактора или цифрового кода
 exports.get2PARequestId = async (req, res) => {
@@ -662,3 +637,6 @@ exports.checkPinCode = async (req, res) => {
        response.error(req, res, error); 
   }
 };
+
+
+
