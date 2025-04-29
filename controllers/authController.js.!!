@@ -363,105 +363,81 @@ exports.pinCodeLogon = async (req, res) => {
   const {code} = req.body;  
   let isMatch = false;
   try {    
-    const telegramId = telegramAuth.getTelegramId(req, res);
-    const isTelegramAuth = Boolean(telegramId);
     if(!userId) throw new AuthError(401,  commonFunction.getDescriptionByCode(Number(401) || 500 ));  
     if(!code)   throw new AuthError(422,  commonFunction.getDescriptionByCode(Number(422) || 500 ));  
 
     const factor = await userHelper.getPinCodeFactor(userId);    
     isMatch = await bcrypt.compare(code.trim().toLowerCase(), factor.pinCode); // сравниваем     
-    console.log(`pinCodeLogon.code.isMatch =>`,isMatch);    
+    console.log(`pinCodeLogon.code =>`,isMacodetch);    
     if (!isMatch)  
       throw new AuthError(422, MESSAGES[LANGUAGE].INVALID_CODE); // пароль не совпал 
-
-    let login = {};
-    let token = await tokenController(req, res, true);
-    claims = getTokenClaims(token); // получили клаймы    
-    // отправляем на создание счета 
-    await createUserAccout(claims?.id)      
-    login.userId         = claims?.id  ?? undefined;;               
-    login.accessToken    = token ?? undefined;
-    login.tokenType      = claims?.type ?? undefined;
-    login.pinCodeEnabled = claims?.pin ?? undefined;
-    login.pinCodeChecked = claims?.pchk ?? undefined;
-    login.isTelegramAuth = isTelegramAuth;
-
-    console.log("pinCodeLogon 4.Отправлен token.claims=>",claims);
-    console.log("pinCodeLogon 5.Отправлен me=>",login);
-
-    res.status(200).json(login); // Успешный ответ    
-    
+    console.log(`pinCodeLogon =>`,isMatch);
   } catch (error) {
-    console.log('pinCodeLogon.getMe error:', error);
-    response.error(req, res, error);
+    console.log(`pinCodeLogon =>`,error);
   }
-  
+  await exports.getMe(req, res, isMatch) 
+  return ;
 };
 
-async function tokenController(req, res, pinChecked = null) {
-  // Проверка авторизации через Telegram
+
+exports.getMe = async (req, res, pinChecked = null ) => {
   try {
+    let login = {};
     let token = exports.getToken(req, res);
     let user = null;
-    const telegramId = telegramAuth.getTelegramId(req, res);  
+
+    // Проверка авторизации через Telegram
+    const telegramId = telegramAuth.getTelegramId(req, res);
+    const isTelegramAuth = Boolean(telegramId);
     let claims = getTokenClaims(token); // получили клаймы        
-    console.log("1. Пришел token.claims=>", claims);
-  
-  // Если пользователь зашел через Telegram        
-  if (telegramId) {
-    if (pinChecked            // сменить при вводе пин-кода
-      || !isTokenValid(token) // сменить при вводе пин-кода  
-      || !claims?.profile     // отсутствует профиль
-      || !claims?.id          // отсутствует id пользователя
-    ) { // токен кривой или порсрочен
-      console.log(`2.`,
+    console.log("1. Пришел token.claims=>",claims);
+
+    // Если пользователь зашел через Telegram        
+    if (telegramId) {
+          if (pinChecked
+            || !isTokenValid(token) 
+                || !claims?.profile 
+                    || !claims?.id                                              
+              ) { // токен кривой или порсрочен
+
+        console.log(`2.`,
         `telegramId =>`, telegramId,
         `pinChecked => `, pinChecked,
         `isTokenValid(token) =>`, isTokenValid(token),
         `claims => `, claims)
-          
-      user = await getTelegramUserIdWithRegistration(telegramId)   // проводим проверку профиля или пересоздаем его          
-      const factor = await userHelper.getPinCodeFactor(user?.getId());              
-      user.pinCodeEnabled = (factor?.pinCode ? true : false);
-      user.pinCodeChecked = pinChecked ?? (claims?.pchk);     // проверяем прошел ли пользователь авторизацию пин-кодом
+                  
+                  
+          user = await getTelegramUserIdWithRegistration(telegramId)   // проводим проверку профиля или пересоздаем его          
+          const factor = await userHelper.getPinCodeFactor(user?.getId());              
+          user.pinCodeEnabled = (factor?.pinCode ? true : false);
+          user.pinCodeChecked = pinChecked ?? (claims?.pchk);     // проверяем прошел ли пользователь авторизацию пин-кодом
 
-      console.log(`3. user=>`, user);
-      token = createToken(user); // создали токен          
-    }
-    let _user = await getTelegramUser(req);     
-    await clientService.updateProfileByTelegramId(_user); // сохраняем или обнавляем параметрф телеграм-пользователя  
-  } 
-    return token;  
-  } catch (error) {
-    console.log(`tokenController `,error);
-    return null;
-  }    
-}
+          console.log(`3. user=>`,user);
+          token = createToken(user); // создали токен          
+        }      
 
-// отправляем на создание счета 
-async function createUserAccout(userId = null) {
-  if(!userId) return;
-  try {        
-    const accountRes = await userHelper.createAccounMessageSend(userId);  
-    if(!accountRes) 
-      throw('Send create account to bus error.... ')
-   } catch (error) {
-    console.log(`exports.login =>`,error);
-  }  
-}
+        let _user = await getTelegramUser(req);     
+        let _result = clientService.updateProfileByTelegramId(_user); // сохраняем или обнавляем параметрф телеграм-пользователя
 
-exports.getMe = async (req, res, pinChecked = null ) => {
-  try {
-      let login = {};
-      const telegramId = telegramAuth.getTelegramId(req, res);
-      const isTelegramAuth = Boolean(telegramId);
-      let token = await tokenController(req, res);
+      } else { // пользователь зашел не через телеграм         
+        if (!isTokenValid(token) || !claims?.id) 
+          return res.status(401).json({ message: 'Authorization required' }); // ушли на авторизацию
+      }
+     
       claims = getTokenClaims(token); // получили клаймы    
       // отправляем на создание счета 
-      await createUserAccout(claims?.id)      
-      login.userId         = claims?.id  ?? undefined;;               
-      login.accessToken    = token ?? undefined;
-      login.tokenType      = claims?.type ?? undefined;
+      try {        
+        const accountRes = await userHelper.createAccounMessageSend(claims.id);  
+        if(!accountRes) 
+          throw('Send create account to bus error.... ')
+       } catch (error) {
+        console.log(`exports.login =>`,error);
+      }    
+      user = (claims.id) ? await userHelper.findById(claims.id) :  null;      
+
+      login.userId = claims?.id  ?? undefined;;               
+      login.accessToken = token ?? undefined;
+      login.tokenType = claims?.type ?? undefined;
       login.pinCodeEnabled = claims?.pin ?? undefined;
       login.pinCodeChecked = claims?.pchk ?? undefined;
       login.isTelegramAuth = isTelegramAuth;
