@@ -450,24 +450,45 @@ async function createUserAccout(userId = null) {
   }  
 }
 
+/*
+  const startTime = DateTime.local(); // Отметка времени начала
+  try {
+    // Проверяем соединение с базой данных
+    await pool.query('SELECT 1');
+
+    // Отметка времени завершения
+    const endTime = DateTime.local();
+    const delay = endTime.diff(startTime, 'milliseconds').milliseconds;
+    const formattedDate = endTime.toISO();
+
+    console.log(DateTime.local().diff(startTime, 'milliseconds').milliseconds.toISO())
+
+*/
+
 exports.getMe = async (req, res, pinChecked = null ) => {
   try {
+      const startTime = DateTime.local(); // Отметка времени начала
+      
       let login = {};
       const telegramId = telegramAuth.getTelegramId(req, res);
-      const isTelegramAuth = Boolean(telegramId);
+      console.log(`1=>`,DateTime.local().diff(startTime, 'milliseconds').milliseconds)
+
+      const isTelegramAuth = Boolean(telegramId);      
       let token = await tokenController(req, res);
+      console.log(`2=>`,DateTime.local().diff(startTime, 'milliseconds').milliseconds)
       claims = getTokenClaims(token); // получили клаймы    
-      // отправляем на создание счета 
-      await createUserAccout(claims?.id)      
+      console.log(`3=>`,DateTime.local().diff(startTime, 'milliseconds').milliseconds)      
+      createUserAccout(claims?.id)      // отправляем на создание счета асинхронно]
+      console.log(`4=>`,DateTime.local().diff(startTime, 'milliseconds').milliseconds)
       login.userId         = claims?.id  ?? undefined;;               
-      login.accessToken    = token ?? undefined;
+      login.accessToken    = claims?.id ? token : undefined;
       login.tokenType      = claims?.type ?? undefined;
       login.pinCodeEnabled = claims?.pin ?? undefined;
       login.pinCodeChecked = claims?.pchk ?? undefined;
       login.isTelegramAuth = isTelegramAuth;
 
-      console.log("4.Отправлен token.claims=>",claims);
-      console.log("5.Отправлен me=>",login);
+      console.log("5.Отправлен token.claims=>",claims);
+      console.log("6.Отправлен me=>",login);
 
       res.status(200).json(login); // Успешный ответ    
   } catch (error) {
